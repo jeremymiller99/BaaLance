@@ -14,7 +14,7 @@ let config = {
             //debug: true,
         }
     },
-    scene: [ LoadScene, MainMenu, MainLoop, LanceGame, OutcomeScene, CareerScene ]
+    scene: [ LoadScene, MainMenu, MainLoop, LanceGame, OutcomeScene, CareerScene, ShopScene ]
 }
 
 const game = new Phaser.Game(config)

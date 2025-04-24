@@ -838,8 +838,7 @@ class MainLoop extends Phaser.Scene {
     }
 
     openShop() {
-        // TODO: Implement shop
-        console.log('Shop coming soon!');
+        this.scene.start('ShopScene');
     }
 
     startCareerMode() {
@@ -946,7 +945,7 @@ class MainLoop extends Phaser.Scene {
         const menuItems = [
             { text: "QUICK MATCH", icon: "⚔️", desc: "Battle against a random opponent", action: () => this.startQuickMatch() },
             { text: "CAREER MODE", icon: "👑", desc: "Start your jousting career", action: () => this.startCareerMode() },
-            { text: "ARMORY", icon: "🛡️", desc: "View and equip your gear", action: () => this.openArmory() },
+            { text: "SHOP", icon: "🛡️", desc: "Buy and equip gear", action: () => this.openShop() },
             { text: "OPTIONS", icon: "⚙️", desc: "Adjust game settings", action: () => this.openOptions() }
         ];
         

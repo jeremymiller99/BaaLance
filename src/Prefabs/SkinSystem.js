@@ -31,14 +31,14 @@ class SkinSystem {
             'sheep2_default': {
                 key: 'sheep2_default',
                 name: 'Sheep 2 Default',
-                price: 0,
-                unlocked: true
+                price: 250,
+                unlocked: false
             },
             'ram_default': {
                 key: 'ram_default',
                 name: 'Ram Default',
-                price: 0,
-                unlocked: true
+                price: 1500,
+                unlocked: false
             },
             
         };
