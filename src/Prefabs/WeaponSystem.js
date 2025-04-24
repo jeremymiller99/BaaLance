@@ -117,6 +117,24 @@ class WeaponSystem {
         return this.weaponConfigs[weaponType];
     }
 
+    // Get all available weapons
+    getAllWeapons() {
+        // Convert weapon configs to a format similar to skins for the shop
+        const weapons = {};
+        Object.keys(this.weaponConfigs).forEach(id => {
+            weapons[id] = {
+                id: id,
+                key: id,
+                texture: id,
+                name: `Lance ${id.split('_')[1]}`,
+                description: `A sturdy lance for jousting.`,
+                price: id === 'lance_0' ? 0 : parseInt(id.split('_')[1]) * 500,
+                unlocked: id === 'lance_0' // Lance_0 is unlocked by default
+            };
+        });
+        return weapons;
+    }
+
     destroy() {
         this.weapons.forEach(weapon => weapon.destroy());
         this.weapons.clear();

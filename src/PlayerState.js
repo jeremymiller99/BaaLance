@@ -118,6 +118,39 @@ class PlayerState {
     }
     
     /**
+     * Alias for setCurrentLance to maintain consistency with ShopScene
+     * @param {string} weaponId - The ID of the weapon to set as current
+     */
+    setCurrentWeapon(weaponId) {
+        this.setCurrentLance(weaponId);
+    }
+    
+    /**
+     * Alias for addLance to maintain consistency with ShopScene
+     * @param {string} weaponId - The ID of the weapon to add
+     */
+    unlockWeapon(weaponId) {
+        this.addLance(weaponId);
+    }
+    
+    /**
+     * Update player's money
+     * @param {number} amount - Amount to add (positive) or subtract (negative)
+     */
+    updateMoney(amount) {
+        this.data.money += amount;
+        if (this.data.money < 0) this.data.money = 0;
+    }
+    
+    /**
+     * Unlock a skin if it doesn't exist in the player's collection
+     * @param {string} skinId - The ID of the skin to unlock
+     */
+    unlockSkin(skinId) {
+        this.addSkin(skinId);
+    }
+    
+    /**
      * Update career progress
      * @param {string} enemyId - ID of the defeated enemy
      * @param {boolean} won - Whether the player won
