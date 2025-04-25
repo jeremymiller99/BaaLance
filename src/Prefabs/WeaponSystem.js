@@ -33,17 +33,44 @@ class WeaponSystem {
             'lance_0': {
                 offsetX: 220,
                 offsetY: -15,
-                scale: 0.75
+                scale: 0.75,
+                name: 'Basic Lance',
+                description: 'A simple wooden lance for beginners.',
+                price: 0,
+                unlocked: true, // Starter lance is unlocked by default
+                qteParams: {
+                    speedModifier: 1.0,
+                    barWidth: 400,
+                    buttonCount: 2 // Only Z and X buttons
+                }
             },
             'lance_1': {
                 offsetX: 220,
                 offsetY: -15,
-                scale: 0.75
+                scale: 0.75,
+                name: 'Knight Lance',
+                description: 'A sturdy lance with better balance.',
+                price: 500,
+                unlocked: false,
+                qteParams: {
+                    speedModifier: 1.2,
+                    barWidth: 300,
+                    buttonCount: 3 // Z, X, and C buttons
+                }
             },
             'lance_2': {
                 offsetX: 220,
                 offsetY: -15,
-                scale: 0.75
+                scale: 0.75,
+                name: 'Champion Lance',
+                description: 'A masterfully crafted lance for tournament champions.',
+                price: 1200,
+                unlocked: false,
+                qteParams: {
+                    speedModifier: 2,
+                    barWidth: 225,
+                    buttonCount: 4 // All buttons Z, X, C, V
+                }
             }
         };
     }
@@ -117,22 +144,68 @@ class WeaponSystem {
         return this.weaponConfigs[weaponType];
     }
 
-    // Get all available weapons
+    // Get QTE parameters for a specific weapon
+    getWeaponQTEParams(weaponType) {
+        const config = this.weaponConfigs[weaponType];
+        return config?.qteParams || {
+            speedModifier: 1.0,
+            barWidth: 400,
+            buttonCount: 2
+        };
+    }
+
+    // Get all available weapons for shop display
     getAllWeapons() {
-        // Convert weapon configs to a format similar to skins for the shop
         const weapons = {};
         Object.keys(this.weaponConfigs).forEach(id => {
+            const config = this.weaponConfigs[id];
             weapons[id] = {
                 id: id,
                 key: id,
                 texture: id,
-                name: `Lance ${id.split('_')[1]}`,
-                description: `A sturdy lance for jousting.`,
-                price: id === 'lance_0' ? 0 : parseInt(id.split('_')[1]) * 500,
-                unlocked: id === 'lance_0' // Lance_0 is unlocked by default
+                name: config.name,
+                description: config.description,
+                price: config.price,
+                unlocked: config.unlocked,
+                qteParams: config.qteParams
             };
         });
         return weapons;
+    }
+
+    // Check if a weapon is unlocked
+    isWeaponUnlocked(weaponId) {
+        return this.weaponConfigs[weaponId]?.unlocked || false;
+    }
+
+    // Unlock a weapon
+    unlockWeapon(weaponId) {
+        if (this.weaponConfigs[weaponId]) {
+            this.weaponConfigs[weaponId].unlocked = true;
+            return true;
+        }
+        return false;
+    }
+
+    // Load weapon state from player state
+    loadWeaponState(playerState) {
+        if (playerState.weapons) {
+            Object.keys(playerState.weapons).forEach(weaponId => {
+                if (this.weaponConfigs[weaponId]) {
+                    this.weaponConfigs[weaponId].unlocked = playerState.weapons[weaponId];
+                }
+            });
+        }
+    }
+
+    // Save weapon state to player state
+    saveWeaponState(playerState) {
+        if (!playerState.weapons) {
+            playerState.weapons = {};
+        }
+        Object.keys(this.weaponConfigs).forEach(weaponId => {
+            playerState.weapons[weaponId] = this.weaponConfigs[weaponId].unlocked;
+        });
     }
 
     destroy() {

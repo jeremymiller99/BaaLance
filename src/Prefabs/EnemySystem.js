@@ -9,7 +9,6 @@ class Enemy {
         this.scoreVariance = config.scoreVariance || 2;
         this.minScore = config.minScore || (this.baseScore - this.scoreVariance);
         this.maxScore = config.maxScore || (this.baseScore + this.scoreVariance);
-        this.qteSpeedModifier = config.qteSpeedModifier || 1.0;
         this.description = config.description || '';
         this.unlocked = config.unlocked || false;
         this.league = config.league || 'rookie';
@@ -55,7 +54,6 @@ class EnemySystem {
                 lance: 'lance_0',
                 minScore: 1,
                 maxScore: 5,
-                qteSpeedModifier: 1.0,
                 description: 'A beginner with little experience.',
                 unlocked: true,
                 league: 'rookie',
@@ -69,7 +67,6 @@ class EnemySystem {
                 lance: 'lance_0',
                 minScore: 3,
                 maxScore: 7,
-                qteSpeedModifier: 1.1,
                 description: 'Enthusiastic but lacking technique.',
                 unlocked: true,
                 league: 'rookie',
@@ -85,7 +82,6 @@ class EnemySystem {
                 lance: 'lance_1',
                 minScore: 5,
                 maxScore: 10,
-                qteSpeedModifier: 1.2,
                 description: 'Experienced and confident.',
                 unlocked: false,
                 league: 'amateur',
@@ -99,7 +95,6 @@ class EnemySystem {
                 lance: 'lance_1',
                 minScore: 7,
                 maxScore: 12,
-                qteSpeedModifier: 1.3,
                 description: 'All about flair and technique.',
                 unlocked: false,
                 league: 'amateur',
@@ -115,7 +110,6 @@ class EnemySystem {
                 lance: 'lance_2',
                 minScore: 9,
                 maxScore: 15,
-                qteSpeedModifier: 1.5,
                 description: 'A true jousting champion.',
                 unlocked: false,
                 league: 'pro',
@@ -129,7 +123,6 @@ class EnemySystem {
                 lance: 'lance_2',
                 minScore: 12,
                 maxScore: 20,
-                qteSpeedModifier: 1.8,
                 description: 'The final boss of jousting.',
                 unlocked: false,
                 league: 'pro',

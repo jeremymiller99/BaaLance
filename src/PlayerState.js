@@ -20,12 +20,14 @@ class PlayerState {
                 highestScore: 0
             },
             equipment: {
-                currentLance: 'lance_0',
-                ownedLances: ['lance_0', 'lance_1', 'lance_2']
+                currentLance: 'lance_0'
             },
             currentSkin: 'default',
             skins: {
                 'default': true
+            },
+            weapons: {
+                'lance_0': true  // Only the basic lance is unlocked by default
             }
         };
         
@@ -102,35 +104,26 @@ class PlayerState {
      * @param {string} lanceId - The ID of the lance to set as current
      */
     setCurrentLance(lanceId) {
-        if (this.data.equipment.ownedLances.includes(lanceId)) {
+        if (this.data.weapons[lanceId]) {
             this.data.equipment.currentLance = lanceId;
         }
     }
     
     /**
-     * Add a new lance to the player's collection
-     * @param {string} lanceId - The ID of the lance to add
+     * Check if a weapon is unlocked
+     * @param {string} weaponId - The ID of the weapon to check
+     * @returns {boolean} Whether the weapon is unlocked
      */
-    addLance(lanceId) {
-        if (!this.data.equipment.ownedLances.includes(lanceId)) {
-            this.data.equipment.ownedLances.push(lanceId);
-        }
+    isWeaponUnlocked(weaponId) {
+        return !!this.data.weapons[weaponId];
     }
     
     /**
-     * Alias for setCurrentLance to maintain consistency with ShopScene
-     * @param {string} weaponId - The ID of the weapon to set as current
-     */
-    setCurrentWeapon(weaponId) {
-        this.setCurrentLance(weaponId);
-    }
-    
-    /**
-     * Alias for addLance to maintain consistency with ShopScene
-     * @param {string} weaponId - The ID of the weapon to add
+     * Unlock a new weapon
+     * @param {string} weaponId - The ID of the weapon to unlock
      */
     unlockWeapon(weaponId) {
-        this.addLance(weaponId);
+        this.data.weapons[weaponId] = true;
     }
     
     /**

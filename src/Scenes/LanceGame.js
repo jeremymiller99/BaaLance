@@ -1,6 +1,9 @@
 class LanceGame extends Phaser.Scene {
     constructor() {
         super({ key: 'LanceGame' }); 
+        
+        // Debug menu
+        this.debugMenu = null;
     }
     
     init(data) {
@@ -15,8 +18,10 @@ class LanceGame extends Phaser.Scene {
         this.isGameActive = false;
         this.scrollSpeedIncrease = 0.5; // Amount to increase scroll speed by each button press
         this.scrollSpeed = 2.0; // Base scroll speed is now constant
-        this.qteSpeedModifier = data.qteSpeedModifier || 1.0; // Renamed from scrollSpeedModifier
         this.gameDuration = 15000; // Define game duration here for consistency
+        
+        // Initialize weapon system to get QTE parameters
+        this.weaponSystem = new WeaponSystem(this);
         
         // If we're in quick match mode and don't have an opponent ID yet, select a random one
         if (this.matchType === 'quick' && !this.opponentId) {
@@ -40,12 +45,6 @@ class LanceGame extends Phaser.Scene {
             this.opponentId = selectedEnemy.id;
             this.opponentSkin = selectedEnemy.skin;
             this.opponentLance = selectedEnemy.lance;
-            this.qteSpeedModifier = selectedEnemy.qteSpeedModifier; // Use qteSpeedModifier
-            
-            // If no opponent score was provided, calculate one based on the enemy's range
-            if (this.opponentScore === 0) {
-                this.opponentScore = selectedEnemy.calculateScore();
-            }
         }
     }
     
@@ -88,11 +87,13 @@ class LanceGame extends Phaser.Scene {
         // Add player to container
         this.playerContainer.add(player);
 
-        // Initialize weapon system
-        this.weaponSystem = new WeaponSystem(this);
-        
-        // Equip lance based on player state
+        // Get the player's current lance from PlayerState
         const playerLance = playerState.getState().equipment.currentLance || 'lance_0';
+        
+        // Get QTE parameters for the player's lance
+        const playerWeaponQteParams = this.weaponSystem.getWeaponQTEParams(playerLance);
+        
+        // Equip the player's lance
         this.weaponSystem.equipWeapon(this.playerContainer, playerLance);
         
         // Create tween for single left-to-right movement
@@ -104,8 +105,8 @@ class LanceGame extends Phaser.Scene {
             repeat: 0 // No repeat
         });
 
-        // Initialize button manager with match type and QTE speed modifier
-        this.buttonManager = new ButtonManager(this, this.matchType, this.qteSpeedModifier);
+        // Initialize button manager with match type and QTE parameters
+        this.buttonManager = new ButtonManager(this, this.matchType, playerWeaponQteParams);
         this.buttonManager.create();
 
         // Initialize score display
@@ -130,10 +131,13 @@ class LanceGame extends Phaser.Scene {
                 opponentId: this.opponentId,
                 opponentSkin: this.opponentSkin,
                 opponentLance: this.opponentLance,
-                qteSpeedModifier: this.qteSpeedModifier,
                 currentSkin: this.currentSkin
             });
         });
+
+        // Initialize debug menu at the end
+        this.debugMenu = new DebugMenu(this);
+        this.debugMenu.create();
     }
 
     update(time, delta) {
@@ -174,6 +178,13 @@ class LanceGame extends Phaser.Scene {
         if (this.weaponSystem) {
             this.weaponSystem.destroy();
         }
+        
+        // Clean up debug menu
+        if (this.debugMenu) {
+            this.debugMenu.destroy();
+            this.debugMenu = null;
+        }
+        
         this.events.off('gameEnded'); // Remove event listener
         this.isGameActive = false;
     }

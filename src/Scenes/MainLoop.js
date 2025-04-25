@@ -39,6 +39,9 @@ class MainLoop extends Phaser.Scene {
         
         // Track created containers for proper cleanup
         this.containerElements = [];
+        
+        // Debug menu
+        this.debugMenu = null;
     }
 
     init(data) {
@@ -74,6 +77,10 @@ class MainLoop extends Phaser.Scene {
         if (pendingUpdate) {
             this.createStatsBoard(); // Refresh stats
         }
+        
+        // Initialize debug menu
+        this.debugMenu = new DebugMenu(this);
+        this.debugMenu.create();
     }
 
     createBackground() {
@@ -869,6 +876,12 @@ class MainLoop extends Phaser.Scene {
         this.skinSystem = null;
         this.containerElements.forEach(container => container.destroy());
         this.containerElements = [];
+        
+        // Clean up debug menu
+        if (this.debugMenu) {
+            this.debugMenu.destroy();
+            this.debugMenu = null;
+        }
     }
 
     createTitleAndMenus() {

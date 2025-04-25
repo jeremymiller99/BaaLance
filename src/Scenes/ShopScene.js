@@ -39,6 +39,9 @@ class ShopScene extends Phaser.Scene {
         this.weaponSystem = null;
         this.selectedCategory = 'skins';
         this.playerMoney = 0;
+        
+        // Debug menu
+        this.debugMenu = null;
     }
     
     create() {
@@ -58,6 +61,9 @@ class ShopScene extends Phaser.Scene {
         // Load player data
         this.playerMoney = playerState.getState().money;
         
+        // Load weapon state from PlayerState
+        this.weaponSystem.loadWeaponState(playerState.getState());
+        
         // Sync unlocked items
         this.syncUnlockedItems();
         
@@ -67,16 +73,25 @@ class ShopScene extends Phaser.Scene {
         
         // Show default category
         this.showCategory('skins');
+        
+        // Initialize debug menu
+        this.debugMenu = new DebugMenu(this);
+        this.debugMenu.create();
     }
     
     createFallbackPlayerState() {
         return {
-            getState: () => ({ money: 0, skins: {}, equipment: { ownedLances: [], currentLance: null } }),
+            getState: () => ({ 
+                money: 0, 
+                skins: {}, 
+                equipment: { currentLance: null },
+                weapons: {}
+            }),
             updateMoney: () => {},
             unlockSkin: () => {},
             setCurrentSkin: () => {},
             unlockWeapon: () => {},
-            setCurrentWeapon: () => {},
+            setCurrentLance: () => {},
             addSkin: () => {}
         };
     }
@@ -223,7 +238,7 @@ class ShopScene extends Phaser.Scene {
         // Categories
         const categories = [
             { id: 'skins', name: 'Character Skins' },
-            { id: 'lances', name: 'Weapons' }
+            { id: 'weapons', name: 'Weapons' }
         ];
         
         // Create container
@@ -452,7 +467,7 @@ class ShopScene extends Phaser.Scene {
                 itemImage = this.add.sprite(0, -30, key, frame).setScale(0.25);
                 
                 // Apply rotation only to lances (weapons), not character skins
-                if (this.selectedCategory === 'lances') {
+                if (this.selectedCategory === 'weapons') {
                     itemImage.setRotation(Math.PI / 4); // 45 degrees in radians
                     itemImage.setScale(0.2); // Make lances slightly smaller
                 }
@@ -667,7 +682,7 @@ class ShopScene extends Phaser.Scene {
             const itemImage = this.add.sprite(0, -50, key, frame).setScale(0.35);
             
             // Apply rotation only to lances (weapons), not character skins
-            if (this.selectedCategory === 'lances') {
+            if (this.selectedCategory === 'weapons') {
                 itemImage.setRotation(Math.PI / 4); // 45 degrees in radians
                 itemImage.setScale(0.3);
             }
@@ -718,9 +733,7 @@ class ShopScene extends Phaser.Scene {
         if (this.selectedCategory === 'skins') {
             return playerData.skins && playerData.skins[itemId];
         } else {
-            return playerData.equipment && 
-                   playerData.equipment.ownedLances && 
-                   playerData.equipment.ownedLances.includes(itemId);
+            return playerData.weapons && playerData.weapons[itemId];
         }
     }
     
@@ -753,7 +766,7 @@ class ShopScene extends Phaser.Scene {
                 playerState.setCurrentSkin(item.id);
             } else {
                 playerState.unlockWeapon(item.id);
-                playerState.setCurrentWeapon(item.id);
+                playerState.setCurrentLance(item.id);
             }
             
             // Play sound if available
@@ -775,12 +788,19 @@ class ShopScene extends Phaser.Scene {
     selectItem(item) {
         if (!item || !item.id) return;
         
+        // For debugging
+        console.log(`Selecting item: ${item.id} in category: ${this.selectedCategory}`);
+        console.log(`Player state before selection:`, playerState.getState());
+        
         // Update player state
         if (this.selectedCategory === 'skins') {
             playerState.setCurrentSkin(item.id);
         } else {
-            playerState.setCurrentWeapon(item.id);
+            playerState.setCurrentLance(item.id);
         }
+        
+        // For debugging
+        console.log(`Player state after selection:`, playerState.getState());
         
         // Play sound if available
         if (this.sound.get('select')) {
@@ -941,24 +961,25 @@ class ShopScene extends Phaser.Scene {
         // Sync weapons
         const weapons = this.weaponSystem.getAllWeapons();
         
-        // Initialize equipment if not exists
-        if (!playerData.equipment) {
-            playerData.equipment = { ownedLances: [], currentLance: null };
-        }
-        if (!playerData.equipment.ownedLances) {
-            playerData.equipment.ownedLances = [];
+        // Sync weapons from WeaponSystem to PlayerState
+        if (!playerData.weapons) {
+            playerData.weapons = {};
         }
         
-        // Sync weapons from WeaponSystem to PlayerState
+        // Sync in both directions
         Object.keys(weapons).forEach(weaponId => {
-            if (weapons[weaponId].unlocked && !playerData.equipment.ownedLances.includes(weaponId)) {
-                playerData.equipment.ownedLances.push(weaponId);
+            if (weapons[weaponId].unlocked) {
+                playerState.unlockWeapon(weaponId);
+            }
+            if (playerData.weapons[weaponId]) {
+                this.weaponSystem.unlockWeapon(weaponId);
             }
         });
         
         // Set default weapon if none selected
-        if (!playerData.equipment.currentLance && playerData.equipment.ownedLances.length > 0) {
-            playerData.equipment.currentLance = playerData.equipment.ownedLances[0];
+        if (!playerData.equipment.currentLance && Object.keys(playerData.weapons).some(id => playerData.weapons[id])) {
+            const firstUnlockedWeapon = Object.keys(playerData.weapons).find(id => playerData.weapons[id]);
+            playerData.equipment.currentLance = firstUnlockedWeapon;
         }
         
         console.log('Item systems synchronized');
@@ -976,6 +997,12 @@ class ShopScene extends Phaser.Scene {
         
         if (this.mainPanel) {
             this.mainPanel.removeAll(true);
+        }
+        
+        // Clean up debug menu
+        if (this.debugMenu) {
+            this.debugMenu.destroy();
+            this.debugMenu = null;
         }
     }
 } 

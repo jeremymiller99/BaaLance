@@ -36,6 +36,9 @@ class CareerScene extends Phaser.Scene {
                 BUTTON_SPACING: 20
             }
         };
+        
+        // Debug menu
+        this.debugMenu = null;
     }
     
     create() {
@@ -60,6 +63,10 @@ class CareerScene extends Phaser.Scene {
         
         // Create return button
         this.createReturnButton();
+        
+        // Initialize debug menu
+        this.debugMenu = new DebugMenu(this);
+        this.debugMenu.create();
     }
     
     createBackground() {
@@ -625,7 +632,11 @@ class CareerScene extends Phaser.Scene {
         const playerSkinKey = skinSystem.getSkinTextureKey(playerSkin);
         const player = this.add.sprite(0, 0, playerSkinKey).setScale(1.0);
         playerContainer.add(player);
-        this.weaponSystem.equipWeapon(playerContainer, playerLance, null, null, false, 1.0);
+        
+        // Equip smaller lance at -30-degree angle for player, moved forward and slightly up
+        const playerWeapon = this.weaponSystem.equipWeapon(playerContainer, playerLance, -15, -15, false, 0.5); // Offset X by -15, Y by -15, smaller scale (0.5)
+        this.weaponSystem.updateWeaponRotation(playerContainer, -Math.PI / 6); // -30 degrees in radians (inverted)
+        
         this.matchupPreview.add(playerContainer);
         
         // Player name with medieval styling
@@ -653,7 +664,11 @@ class CareerScene extends Phaser.Scene {
         const enemySprite = this.add.sprite(0, 0, enemySkinKey).setScale(1.0);
         enemySprite.setFlipX(true);
         enemyContainer.add(enemySprite);
-        this.weaponSystem.equipWeapon(enemyContainer, enemy.lance, null, null, true, 1.0);
+        
+        // Equip smaller lance at 30-degree angle for enemy, moved forward and slightly up
+        const enemyWeapon = this.weaponSystem.equipWeapon(enemyContainer, enemy.lance, 15, -15, true, 0.5); // Offset X by 15 (positive for flipped), Y by -15, smaller scale (0.5)
+        this.weaponSystem.updateWeaponRotation(enemyContainer, Math.PI / 6); // 30 degrees in radians (inverted)
+        
         this.matchupPreview.add(enemyContainer);
         
         // Enemy name with medieval styling
@@ -1274,7 +1289,6 @@ class CareerScene extends Phaser.Scene {
                     opponentId: enemy.id,
                     opponentScore: enemy.calculateScore(),
                     matchType: 'career',
-                    qteSpeedModifier: enemy.qteSpeedModifier,
                     opponentSkin: enemy.skin,     // Explicitly pass enemy skin
                     opponentLance: enemy.lance,   // Explicitly pass enemy lance
                     currentSkin: playerState.getState().currentSkin
@@ -1644,5 +1658,16 @@ class CareerScene extends Phaser.Scene {
                 this.disableContainerInteractive(item);
             }
         });
+    }
+    
+    // Update or add a shutdown method to clean up the debug menu
+    shutdown() {
+        // ... existing code for shutdown ...
+        
+        // Clean up debug menu
+        if (this.debugMenu) {
+            this.debugMenu.destroy();
+            this.debugMenu = null;
+        }
     }
 } 

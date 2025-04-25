@@ -1,5 +1,5 @@
 class ButtonManager {
-    constructor(scene, matchType = 'quick', qteSpeedModifier = 1.0) {
+    constructor(scene, matchType = 'quick', qteParams = null) {
         this.scene = scene;
         this.buttons = ['Z', 'X', 'C', 'V'];
         this.currentButton = null;
@@ -11,10 +11,22 @@ class ButtonManager {
         this.buttonPressed = false; // Track if button has been pressed
         this.matchType = matchType;
         this.isGameStarted = false;
-        this.qteSpeedModifier = qteSpeedModifier; // Store the QTE speed modifier
+        
+        // Default QTE parameters
+        this.defaultQteParams = {
+            speedModifier: 1.0,
+            barWidth: 400,
+            buttonCount: 4 // Default to all 4 buttons
+        };
+        
+        // Apply provided QTE parameters or use defaults
+        this.qteParams = qteParams || this.defaultQteParams;
+        
+        // Set the QTE speed modifier from parameters
+        this.qteSpeedModifier = this.qteParams.speedModifier;
         
         // QTE meter properties
-        this.meterWidth = 400;
+        this.meterWidth = this.qteParams.barWidth || 400;
         this.meterHeight = 30;
         this.indicatorSize = 15;
         this.indicatorPosition = 0;
@@ -26,6 +38,10 @@ class ButtonManager {
         this.hitThreshold = 20; // How close the indicator needs to be to the target to count as a "hit"
         this.perfectThreshold = 10; // How close for a perfect hit
         
+        // Get active buttons based on buttonCount
+        this.activeButtonCount = this.qteParams.buttonCount || 4;
+        this.activeButtons = this.buttons.slice(0, this.activeButtonCount);
+        
         // QTE visual elements
         this.meterBar = null;
         this.movingIndicator = null;
@@ -35,8 +51,9 @@ class ButtonManager {
     }
 
     create() {
-        // Create keyboard input
-        this.keys = this.scene.input.keyboard.addKeys('Z,X,C,V');
+        // Create keyboard input for active buttons only
+        const keyString = this.activeButtons.join(',');
+        this.keys = this.scene.input.keyboard.addKeys(keyString);
 
         // Create button text style
         this.buttonStyle = {
@@ -140,7 +157,7 @@ class ButtonManager {
         // Check keyboard input
         if (this.currentButton && this.targetZone && !this.buttonPressed) {
             // Check if any key is pressed
-            for (const button of this.buttons) {
+            for (const button of this.activeButtons) {
                 if (this.keys[button].isDown) {
                     // Check if correct button is pressed
                     if (button === this.currentButton) {
@@ -345,9 +362,9 @@ class ButtonManager {
         // Store reference to the main target zone (using perfect zone)
         this.targetZone = this.perfectZone;
         
-        // Choose a random button for this target
-        const buttonIndex = Phaser.Math.Between(0, this.buttons.length - 1);
-        this.currentButton = this.buttons[buttonIndex];
+        // Choose a random button from the active buttons for this target
+        const buttonIndex = Phaser.Math.Between(0, this.activeButtonCount - 1);
+        this.currentButton = this.activeButtons[buttonIndex];
         
         // Create button prompt
         this.buttonText = this.scene.add.text(
@@ -448,7 +465,8 @@ class ButtonManager {
         }
         
         if (this.keys) {
-            this.scene.input.keyboard.removeKeys('Z,X,C,V');
+            const keyString = this.activeButtons.join(',');
+            this.scene.input.keyboard.removeKeys(keyString);
             this.keys = null;
         }
         

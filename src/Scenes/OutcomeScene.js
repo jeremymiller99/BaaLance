@@ -6,6 +6,9 @@ class OutcomeScene extends Phaser.Scene {
         this.rpsGameActive = false;
         this.playerChoice = null;
         this.opponentChoice = null;
+        
+        // Debug menu
+        this.debugMenu = null;
     }
 
     init(data) {
@@ -17,7 +20,6 @@ class OutcomeScene extends Phaser.Scene {
         this.opponentLance = data.opponentLance || 'lance_0';
         this.isTie = this.finalScore === this.opponentScore;
         this.won = this.finalScore > this.opponentScore;
-        this.qteSpeedModifier = data.qteSpeedModifier || 1.0; // Renamed from finalSpeed
         this.currentSkin = data.currentSkin || 'default';
         
         // For career mode, make sure we have the correct opponent data
@@ -65,6 +67,10 @@ class OutcomeScene extends Phaser.Scene {
             this.joustingOutcome = new JoustingOutcome(this, this.won, this.currentSkin);
             this.joustingOutcome.create();
         }
+
+        // Initialize debug menu at the end of create method
+        this.debugMenu = new DebugMenu(this);
+        this.debugMenu.create();
     }
 
     setupRockPaperScissors() {
@@ -571,6 +577,12 @@ class OutcomeScene extends Phaser.Scene {
         // Clean up when scene is shut down
         if (this.joustingOutcome) {
             this.joustingOutcome.destroy();
+        }
+        
+        // Clean up debug menu
+        if (this.debugMenu) {
+            this.debugMenu.destroy();
+            this.debugMenu = null;
         }
     }
 
