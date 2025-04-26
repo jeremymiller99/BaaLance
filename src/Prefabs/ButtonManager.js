@@ -12,6 +12,12 @@ class ButtonManager {
         this.matchType = matchType;
         this.isGameStarted = false;
         
+        // Stability tracking - new properties
+        this.consecutiveMistakes = 0; // Track consecutive mistakes
+        this.stabilityLevel = 0; // 0 = stable, 1 = wobble, 2 = severe wobble, 3 = critical
+        this.wobbleTween = null; // Reference to the wobble animation
+        this.stabilityIndicators = []; // Array to store UI indicators for stability
+        
         // Default QTE parameters
         this.defaultQteParams = {
             speedModifier: 1.0,
@@ -30,8 +36,10 @@ class ButtonManager {
         this.meterHeight = 30;
         this.indicatorSize = 15;
         this.indicatorPosition = 0;
-        this.baseIndicatorSpeed = 2; // Base speed before modification
-        this.indicatorSpeed = this.baseIndicatorSpeed * this.qteSpeedModifier; // Apply speed modifier
+        
+        // Use pixels per second for consistent movement across frame rates
+        this.baseIndicatorSpeedPerSecond = 120; // Base speed in pixels per second
+        this.indicatorSpeedPerSecond = this.baseIndicatorSpeedPerSecond * this.qteSpeedModifier; // Apply speed modifier
         this.indicatorDirection = 1; // 1 for right, -1 for left
         this.targetPosition = 0;
         this.targetWidth = 40;
@@ -48,6 +56,9 @@ class ButtonManager {
         this.targetZone = null;
         this.perfectZone = null; // Perfect hit zone
         this.goodZone = null; // Good hit zone
+        
+        // Last update time for delta calculations
+        this.lastUpdateTime = 0;
     }
 
     create() {
@@ -112,6 +123,97 @@ class ButtonManager {
         
         // Reset indicator position to be at the center initially
         this.indicatorPosition = this.meterWidth / 2;
+        
+        // Create stability indicators
+        this.createStabilityIndicators();
+        
+        // Listen for screen shake complete event
+        this.scene.events.on('screenShakeComplete', () => {
+            // This event callback could be used to synchronize animations
+            // after screen shake completes
+        });
+    }
+
+    createStabilityIndicators() {
+        // Clear existing indicators
+        this.clearStabilityIndicators();
+        
+        const { width: w, height: h } = this.scene.cameras.main;
+        
+        // Create a container for the stability UI at the top center
+        const indicatorSize = 20;
+        const indicatorSpacing = 10;
+        const indicatorCount = 3; // We need 3 indicators for levels 0-3
+        
+        // Calculate total width of all indicators with spacing
+        const totalWidth = (indicatorSize * indicatorCount) + (indicatorSpacing * (indicatorCount - 1));
+        let startX = (w / 2) - (totalWidth / 2) + (indicatorSize / 2);
+        
+        // Adjusted Y position for indicators - moved below score panel at Y=100
+        const indicatorY = 100;
+        
+        // Create the indicators (removed the label text)
+        for (let i = 0; i < indicatorCount; i++) {
+            const indicator = this.scene.add.circle(
+                startX + (i * (indicatorSize + indicatorSpacing)),
+                indicatorY,
+                indicatorSize / 2,
+                0x333333
+            );
+            
+            // Add stroke
+            indicator.setStrokeStyle(2, 0xffffff);
+            
+            // Set depth to ensure the indicators are visible but behind other UI
+            indicator.setDepth(5);
+            
+            this.stabilityIndicators.push(indicator);
+        }
+        
+        // Update indicators to match current stability level
+        this.updateStabilityIndicators();
+    }
+    
+    updateStabilityIndicators() {
+        // Skip if there are no indicators
+        if (this.stabilityIndicators.length < 3) return;
+        
+        // Use red for all filled indicators
+        const filledColor = 0xff0000; // Red for all levels
+        
+        // Update color of each indicator based on stability level
+        for (let i = 0; i < 3; i++) {
+            const indicator = this.stabilityIndicators[i];
+            
+            if (i < this.stabilityLevel) {
+                // All filled indicators are red
+                indicator.setFillStyle(filledColor);
+            } else {
+                // Reset to gray
+                indicator.setFillStyle(0x333333);
+            }
+        }
+        
+        // Flash all indicators if at critical level
+        if (this.stabilityLevel === 3) {
+            this.scene.tweens.add({
+                targets: this.stabilityIndicators,
+                alpha: 0.3,
+                duration: 200,
+                yoyo: true,
+                repeat: 2
+            });
+        }
+    }
+    
+    clearStabilityIndicators() {
+        // Destroy all existing stability indicators
+        this.stabilityIndicators.forEach(indicator => {
+            if (indicator) {
+                indicator.destroy();
+            }
+        });
+        this.stabilityIndicators = [];
     }
 
     startGame() {
@@ -123,6 +225,14 @@ class ButtonManager {
         this.startTime = this.scene.time.now;
         this.isGameStarted = true;
         this.score = 0; // Reset score
+        
+        // Reset stability tracking
+        this.consecutiveMistakes = 0;
+        this.stabilityLevel = 0;
+        if (this.wobbleTween) {
+            this.wobbleTween.stop();
+            this.wobbleTween = null;
+        }
         
         // Set indicator to center position initially
         this.indicatorPosition = this.meterWidth / 2;
@@ -140,7 +250,15 @@ class ButtonManager {
         this.spawnTarget();
     }
 
-    update(time) {
+    update(time, delta) {
+        // Store the last update time for delta calculations
+        if (this.lastUpdateTime === 0) {
+            this.lastUpdateTime = time;
+        }
+        
+        // Calculate delta time in seconds
+        const deltaSeconds = delta / 1000;
+        
         // Only process game logic if the game has actually started
         if (!this.isGameStarted || this.startTime === null) return;
         
@@ -151,8 +269,13 @@ class ButtonManager {
             return;
         }
         
-        // Update indicator position
-        this.updateIndicator();
+        // Don't process any more input if player has fallen off
+        if (this.stabilityLevel >= 4) {
+            return;
+        }
+        
+        // Update indicator position using delta time
+        this.updateIndicator(deltaSeconds);
         
         // Check keyboard input
         if (this.currentButton && this.targetZone && !this.buttonPressed) {
@@ -183,20 +306,18 @@ class ButtonManager {
                     
                     this.buttonPressed = true;
                     
-                    // Create a short delay before spawning next target
-                    this.scene.time.delayedCall(500, () => {
-                        this.spawnTarget();
-                    });
-                    
                     break; // Exit the loop after handling the first key press
                 }
             }
         }
+        
+        // Update last update time
+        this.lastUpdateTime = time;
     }
     
-    updateIndicator() {
-        // Update indicator position with speed and direction
-        this.indicatorPosition += this.indicatorSpeed * this.indicatorDirection;
+    updateIndicator(deltaSeconds) {
+        // Update indicator position with speed, direction, and delta time
+        this.indicatorPosition += this.indicatorSpeedPerSecond * this.indicatorDirection * deltaSeconds;
         
         // Set boundaries more precisely
         const indicatorWidth = 4; // Width of our line (increased from 2 to 4)
@@ -222,10 +343,26 @@ class ButtonManager {
     handleSuccessfulHit(points, message) {
         // Visual feedback for hit
         this.targetZone.setStrokeStyle(2, 0x00ff00);
-        this.score += points;
+        
+        // Calculate total points
+        const totalPoints = points;
+        
+        // Update score
+        this.score += totalPoints;
+        
+        // Play success sound
+        if (audioSystem) {
+            audioSystem.playSfx('qteCorrect', { volume: points >= 3 ? 1.0 : 0.8 });
+        }
         
         // Increase scroll speed on hit
-        this.scene.increaseScrollSpeed();
+        if (this.scene.increaseScrollSpeed) {
+            this.scene.increaseScrollSpeed();
+        }
+        
+        // Increment stability (successful hit = more stable)
+        this.consecutiveMistakes = 0;
+        this.updateStability(-1); // Reduce instability, negative makes it more stable
         
         // Create score popup
         const scorePopup = this.scene.add.text(
@@ -260,11 +397,45 @@ class ButtonManager {
             duration: 100,
             repeat: 2
         });
+        
+        // NOTE: Spawn target code is removed to prevent double spawning in monkey-patched version
     }
     
     handleFailedHit(message = 'MISS!') {
         // Visual feedback for miss
         this.targetZone.setStrokeStyle(2, 0xff0000);
+        
+        // Play fail sound
+        if (audioSystem) {
+            audioSystem.playSfx('qteMistake');
+        }
+        
+        // Increase consecutive mistakes count and update stability
+        this.consecutiveMistakes++;
+        if (this.consecutiveMistakes >= 1) {
+            // Use the delta parameter to increase stability level, capped at 3 (critical)
+            this.updateStability(1); // Increase instability by 1 level
+            
+            // If this is the 4th consecutive mistake, trigger game over
+            if (this.consecutiveMistakes >= 4) {
+                this.stabilityLevel = 4; // Fallen off
+                
+                // Immediately hide all QTE elements to make clear the game over
+                if (this.meterBar) this.meterBar.setVisible(false);
+                if (this.meterBorder) this.meterBorder.setVisible(false);
+                if (this.movingIndicator) this.movingIndicator.setVisible(false);
+                if (this.targetZone) this.targetZone.setVisible(false);
+                if (this.perfectZone) this.perfectZone.setVisible(false);
+                if (this.goodZone) this.goodZone.setVisible(false);
+                if (this.buttonText) this.buttonText.setVisible(false);
+                
+                // Stop all further input processing
+                this.isGameStarted = false;
+                
+                this.updateStability();
+                return; // Early return as game over will be handled by the fall animation
+            }
+        }
         
         // Add Miss text
         const missText = this.scene.add.text(
@@ -299,6 +470,16 @@ class ButtonManager {
             repeat: 3,
             duration: 50
         });
+        
+        // Spawn a new target after a delay (only if not at critical level 4)
+        if (this.stabilityLevel < 4) {
+            this.buttonPressed = true;
+            this.scene.time.delayedCall(400, () => {
+                if (this.isGameStarted) {
+                    this.spawnTarget();
+                }
+            });
+        }
     }
 
     spawnTarget() {
@@ -324,7 +505,7 @@ class ButtonManager {
         
         // Reset the indicator speed to base value * modifier for each new target
         // This ensures consistent speed throughout the game
-        this.indicatorSpeed = this.baseIndicatorSpeed * this.qteSpeedModifier;
+        this.indicatorSpeedPerSecond = this.baseIndicatorSpeedPerSecond * this.qteSpeedModifier;
         
         // Calculate random position for target zone
         // Make sure the target is within the meter bounds
@@ -425,9 +606,38 @@ class ButtonManager {
     }
 
     reset() {
+        // Stop all ongoing tweens
+        if (this.wobbleTween) {
+            this.wobbleTween.stop();
+            this.wobbleTween = null;
+        }
+        
+        // Reset game state
         this.score = 0;
-        this.startTime = null;
         this.isGameStarted = false;
+        this.startTime = null;
+        this.currentButton = null;
+        this.buttonPressed = false;
+        
+        // Reset stability tracking
+        this.consecutiveMistakes = 0;
+        this.stabilityLevel = 0;
+        
+        // Clean up UI elements
+        if (this.meterBar) {
+            this.meterBar.destroy();
+            this.meterBar = null;
+        }
+        
+        if (this.meterBorder) {
+            this.meterBorder.destroy();
+            this.meterBorder = null;
+        }
+        
+        if (this.movingIndicator) {
+            this.movingIndicator.destroy();
+            this.movingIndicator = null;
+        }
         
         if (this.buttonText) {
             this.buttonText.destroy();
@@ -449,29 +659,149 @@ class ButtonManager {
             this.goodZone = null;
         }
         
-        if (this.meterBar) {
-            this.meterBar.destroy();
-            this.meterBar = null;
-        }
-        
-        if (this.meterBorder) {
-            this.meterBorder.destroy();
-            this.meterBorder = null;
-        }
-        
-        if (this.movingIndicator) {
-            this.movingIndicator.destroy();
-            this.movingIndicator = null;
-        }
-        
-        if (this.keys) {
-            const keyString = this.activeButtons.join(',');
-            this.scene.input.keyboard.removeKeys(keyString);
-            this.keys = null;
-        }
+        // Clean up stability indicators
+        this.clearStabilityIndicators();
         
         // Reset indicator properties to ensure proper positioning on next creation
         this.indicatorPosition = this.meterWidth / 2;
         this.indicatorDirection = 1;
+        
+        // Clean up event listeners
+        if (this.keys) {
+            // Assuming we created keys with scene.input.keyboard.addKeys
+            Object.values(this.keys).forEach(key => {
+                if (key.removeAllListeners) key.removeAllListeners();
+            });
+            
+            // Reset keys object
+            this.keys = null;
+        }
+        
+        // Remove custom event listeners
+        this.scene.events.off('screenShakeComplete');
+    }
+
+    updateStability(delta = 0) {
+        // Stop any existing wobble tween
+        if (this.wobbleTween) {
+            this.wobbleTween.stop();
+            this.wobbleTween = null;
+        }
+        
+        // Return if the player isn't even created yet
+        if (!this.scene.playerContainer) {
+            return;
+        }
+        
+        // If delta is provided, adjust stability level
+        if (delta !== 0) {
+            // Adjust stability level (negative delta = more stable, positive = less stable)
+            this.stabilityLevel = Math.max(0, Math.min(3, this.stabilityLevel + delta));
+        }
+        
+        // Update the stability indicators
+        this.updateStabilityIndicators();
+        
+        // Apply wobble effect based on stability level
+        switch(this.stabilityLevel) {
+            case 0: // Stable - no wobble
+                // Reset to normal rotation
+                this.scene.playerContainer.rotation = 0;
+                break;
+                
+            case 1: // Slight wobble
+                this.wobbleTween = this.scene.tweens.add({
+                    targets: this.scene.playerContainer,
+                    rotation: { from: -0.05, to: 0.05 },
+                    duration: 400,
+                    ease: 'Sine.easeInOut',
+                    yoyo: true,
+                    repeat: -1
+                });
+                break;
+                
+            case 2: // Moderate wobble
+                this.wobbleTween = this.scene.tweens.add({
+                    targets: this.scene.playerContainer,
+                    rotation: { from: -0.1, to: 0.1 },
+                    duration: 300,
+                    ease: 'Sine.easeInOut',
+                    yoyo: true,
+                    repeat: -1
+                });
+                break;
+                
+            case 3: // Severe wobble - critical
+                this.wobbleTween = this.scene.tweens.add({
+                    targets: this.scene.playerContainer,
+                    rotation: { from: -0.2, to: 0.2 },
+                    duration: 200,
+                    ease: 'Sine.easeInOut',
+                    yoyo: true,
+                    repeat: -1
+                });
+                break;
+                
+            case 4: // Fall off - game over
+                // Animate falling off
+                this.scene.tweens.add({
+                    targets: this.scene.playerContainer,
+                    rotation: 1.5, // 90 degrees tilt
+                    y: '+=200', // Fall downward
+                    duration: 1000,
+                    ease: 'Power2.easeIn',
+                    onComplete: () => this.endGameDueToFall()
+                });
+                break;
+        }
+    }
+    
+    endGameDueToFall() {
+        // Reset score to 0 when fallen off
+        this.score = 0;
+        
+        // Ensure opponent score is at least 1 to guarantee they win
+        if (this.scene.opponentScore === 0) {
+            this.scene.opponentScore = 1;
+        }
+        
+        // Play fall sound
+        if (audioSystem) {
+            audioSystem.playSfx('baa', { volume: 1.5 });
+        }
+        
+        // Make sure player stays off screen by moving it further down
+        if (this.scene.playerContainer) {
+            this.scene.playerContainer.y += 300;
+            this.scene.playerContainer.alpha = 0.5; // Fade out player
+        }
+        
+        // Create game over text with message about falling
+        const { width: w, height: h } = this.scene.cameras.main;
+        const fallText = this.scene.add.text(
+            w / 2, 
+            h / 3,
+            'FELL OFF!',
+            {
+                fontSize: '64px',
+                fontFamily: 'Arial',
+                color: '#ff0000',
+                stroke: '#000000',
+                strokeThickness: 6
+            }
+        ).setOrigin(0.5).setDepth(100);
+        
+        // Flash the text
+        this.scene.tweens.add({
+            targets: fallText,
+            alpha: { from: 0, to: 1 },
+            duration: 200,
+            repeat: 2,
+            yoyo: true,
+            onComplete: () => {
+                // End the game with score of 0
+                this.endGame();
+            }
+        });
     }
 } 

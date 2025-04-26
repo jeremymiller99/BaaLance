@@ -156,6 +156,26 @@ class DebugMenu {
             { text: 'Test Tie', callback: () => this.testMatch('tie') }
         ];
         
+        // New section: Audio controls
+        const audioButtons = [];
+        
+        // Only add audio buttons if the global audio system is available
+        if (audioSystem) {
+            audioButtons.push(
+                { text: 'Toggle Music Mute', callback: () => this.toggleMusicMute() },
+                { text: 'Toggle SFX Mute', callback: () => this.toggleSfxMute() },
+                { text: 'Next Song', callback: () => this.nextSong() },
+                { text: 'Music Volume: 100%', callback: () => this.adjustMusicVolume(1.0) },
+                { text: 'Music Volume: 75%', callback: () => this.adjustMusicVolume(0.75) },
+                { text: 'Music Volume: 50%', callback: () => this.adjustMusicVolume(0.5) },
+                { text: 'Music Volume: 25%', callback: () => this.adjustMusicVolume(0.25) },
+                { text: 'SFX Volume: 100%', callback: () => this.adjustSfxVolume(1.0) },
+                { text: 'SFX Volume: 75%', callback: () => this.adjustSfxVolume(0.75) },
+                { text: 'SFX Volume: 50%', callback: () => this.adjustSfxVolume(0.5) },
+                { text: 'SFX Volume: 25%', callback: () => this.adjustSfxVolume(0.25) }
+            );
+        }
+        
         // Calculate button positioning
         const buttonSpacing = 40;
         const startY = -160;
@@ -167,14 +187,26 @@ class DebugMenu {
         });
         
         // Add separator
-        const separator = this.scene.add.line(0, startY + (playerButtons.length * buttonSpacing) + 10, -125, 0, 125, 0, 0xffffff, 0.5);
-        this.container.add(separator);
+        const separator1 = this.scene.add.line(0, startY + (playerButtons.length * buttonSpacing) + 10, -125, 0, 125, 0, 0xffffff, 0.5);
+        this.container.add(separator1);
         
         // Create match testing buttons
         matchButtons.forEach((button, index) => {
             const y = startY + ((playerButtons.length + 1) * buttonSpacing) + (index * buttonSpacing);
             this.createButton(button.text, 0, y, button.callback, '#ff6666');
         });
+        
+        // Add second separator for audio controls
+        if (audioButtons.length > 0) {
+            const separator2 = this.scene.add.line(0, startY + ((playerButtons.length + matchButtons.length + 2) * buttonSpacing) + 10, -125, 0, 125, 0, 0xffffff, 0.5);
+            this.container.add(separator2);
+            
+            // Create audio control buttons
+            audioButtons.forEach((button, index) => {
+                const y = startY + ((playerButtons.length + matchButtons.length + 3) * buttonSpacing) + (index * buttonSpacing);
+                this.createButton(button.text, 0, y, button.callback, '#66ccff');
+            });
+        }
     }
     
     createButton(text, x, y, callback, textColor = '#ffffff') {
@@ -367,6 +399,52 @@ class DebugMenu {
         
         // Start the outcome scene with the configured data
         this.scene.scene.start('OutcomeScene', data);
+    }
+    
+    // Audio control methods
+    toggleMusicMute() {
+        if (audioSystem) {
+            audioSystem.toggleMusicMute();
+            this.showFeedbackMessage(`Music ${audioSystem.settings.muteMusic ? 'Muted' : 'Unmuted'}`);
+        }
+    }
+    
+    toggleSfxMute() {
+        if (audioSystem) {
+            audioSystem.toggleSfxMute();
+            this.showFeedbackMessage(`SFX ${audioSystem.settings.muteSfx ? 'Muted' : 'Unmuted'}`);
+            
+            // Play a test sound if unmuted
+            if (!audioSystem.settings.muteSfx) {
+                audioSystem.playClick();
+            }
+        }
+    }
+    
+    adjustSfxVolume(volume) {
+        if (audioSystem) {
+            audioSystem.setSfxVolume(volume);
+            this.showFeedbackMessage(`SFX Volume: ${Math.round(volume * 100)}%`);
+            
+            // Play a test sound
+            audioSystem.playClick();
+        }
+    }
+    
+    // Next song control
+    nextSong() {
+        if (audioSystem) {
+            audioSystem.nextSong();
+            this.showFeedbackMessage('Playing next song in playlist');
+        }
+    }
+    
+    // Music volume control
+    adjustMusicVolume(volume) {
+        if (audioSystem) {
+            audioSystem.setMusicVolume(volume);
+            this.showFeedbackMessage(`Music Volume: ${Math.round(volume * 100)}%`);
+        }
     }
     
     destroy() {

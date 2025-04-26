@@ -6,6 +6,8 @@ class OutcomeScene extends Phaser.Scene {
         this.rpsGameActive = false;
         this.playerChoice = null;
         this.opponentChoice = null;
+        this.rpsResultProcessing = false; // Add flag to track result processing
+        this.resultTexts = []; // Initialize resultTexts array
         
         // Debug menu
         this.debugMenu = null;
@@ -21,6 +23,18 @@ class OutcomeScene extends Phaser.Scene {
         this.isTie = this.finalScore === this.opponentScore;
         this.won = this.finalScore > this.opponentScore;
         this.currentSkin = data.currentSkin || 'default';
+        
+        // Reset game state for this scene
+        this.rpsGameActive = false;
+        this.playerChoice = null;
+        this.opponentChoice = null;
+        this.rpsResultProcessing = false;
+        this.resultTexts = [];
+        this.spectators = [];
+        this.joustingOutcome = null;
+        this.rpsPanel = null;
+        this.rpsButtonsContainer = null;
+        this.rpsButtons = null;
         
         // For career mode, make sure we have the correct opponent data
         if (this.matchType === 'career' && this.opponentId && (!this.opponentSkin || !this.opponentLance)) {
@@ -51,13 +65,60 @@ class OutcomeScene extends Phaser.Scene {
         // Get game dimensions
         const { width: w, height: h } = this.cameras.main;
         
-        // Create background
-        const bg = this.add.image(0, 0, 'bg');
-        bg.setOrigin(0, 0);
+        // Initialize UI style constants to match MainLoop scene
+        this.UI = {
+            COLORS: {
+                BACKGROUND: 0x2a1a0a, // Dark brown background
+                BACKGROUND_ALPHA: 0.7,
+                TEXT: '#FFD700', // Gold text
+                TEXT_SECONDARY: '#ffffff', // White text for secondary content
+                WOOD_PRIMARY: 0x8B4513, // Primary wood color
+                WOOD_SECONDARY: 0x5c4033, // Darker wood color
+                WOOD_BORDER: 0x3c2a21, // Wood border color
+                WOOD_GRAIN: 0x3c2a21, // Wood grain color
+                BUTTON_BG: 0x8B4513, // Wooden button color
+                BUTTON_HOVER: 0x654321, // Darker wood for hover
+                BUTTON_ACTIVE: 0x4e3524, // Even darker wood for active
+                METAL: 0x696969, // Metal color for nails
+                METAL_DARK: 0x444444, // Darker metal
+                SUCCESS: 0x00aa00, // Success color
+                VICTORY: 0x006400, // Dark green for victories
+                DEFEAT: 0x8B0000, // Dark red for defeats
+                PARCHMENT: 0xF5DEB3, // Parchment color
+                PARCHMENT_DARK: 0xD2B48C, // Darker parchment color
+                GOLD: 0xFFD700, // Gold color
+                GOLD_DARK: 0xAA8800, // Darker gold color
+                BUTTON: 0x8B4513, // Wooden button color
+                BUTTON_PRESSED: 0x654321, // Darker wood for pressed button
+                TEXT_PRIMARY: '#FFFFFF', // Primary text color
+                TEXT_STROKE: '#000000', // Text stroke color
+                TEXT_BRIGHT: '#FFFFFF' // Bright text color
+            },
+            FONTS: {
+                FAMILY: 'Georgia, serif', // Medieval serif font
+                SIZES: {
+                    TITLE: '32px',
+                    HEADER: '24px',
+                    BODY: '20px'
+                }
+            },
+            PANEL: {
+                WIDTH: 600,
+                HEIGHT: 500,
+                PADDING: 20,
+                BUTTON_HEIGHT: 60,
+                BUTTON_SPACING: 25
+            }
+        };
         
-        // Scale background to fit screen
-        const scale = Math.max(w / bg.width, h / bg.height);
-        bg.setScale(scale);
+        // Initialize or re-init audio system for this scene
+        if (audioSystem) {
+            audioSystem.scene = this;
+            audioSystem.init();
+        }
+        
+        // Create background
+        this.createBackground();
 
         // For a tie, setup the rock-paper-scissors game
         if (this.isTie) {
@@ -72,10 +133,194 @@ class OutcomeScene extends Phaser.Scene {
         this.debugMenu = new DebugMenu(this);
         this.debugMenu.create();
     }
+    
+    createBackground() {
+        const { width: w, height: h } = this.cameras.main;
+        
+        // Set background image
+        const bg = this.add.image(0, 0, 'bg');
+        bg.setOrigin(0, 0);
+        const scale = Math.max(w / bg.width, h / bg.height);
+        bg.setScale(scale);
+        
+        // Remove the overlay for a cleaner look
+    }
+    
+    createWoodenPanel(x, y, width, height, titleText = null) {
+        const { COLORS, FONTS } = this.UI;
+        
+        // Create main container for panel
+        const container = this.add.container(x, y);
+        
+        // Create panel background with wood texture
+        const panel = this.add.rectangle(0, 0, width, height, COLORS.WOOD_PRIMARY, 1);
+        panel.setStrokeStyle(5, COLORS.WOOD_BORDER);
+        container.add(panel);
+        
+        // Add subtle wood grain texture
+        const grainGraphics = this.add.graphics();
+        grainGraphics.lineStyle(1, COLORS.WOOD_GRAIN, 0.2); // More subtle grain
+        
+        // Create horizontal wood grain lines
+        for (let i = -height/2 + 15; i < height/2; i += 20) {
+            grainGraphics.beginPath();
+            grainGraphics.moveTo(-width/2 + 10, i);
+            
+            for (let x = -width/2 + 30; x < width/2; x += 40) {
+                const yOffset = Phaser.Math.Between(-4, 4);
+                grainGraphics.lineTo(x, i + yOffset);
+            }
+            
+            grainGraphics.strokePath();
+        }
+        container.add(grainGraphics);
+        
+        // Add decorative nails/metal fixtures in the corners
+        const cornerOffset = 25;
+        const cornerPositions = [
+            {x: -width/2 + cornerOffset, y: -height/2 + cornerOffset},
+            {x: width/2 - cornerOffset, y: -height/2 + cornerOffset},
+            {x: -width/2 + cornerOffset, y: height/2 - cornerOffset},
+            {x: width/2 - cornerOffset, y: height/2 - cornerOffset}
+        ];
+        
+        cornerPositions.forEach(pos => {
+            // Metal plate
+            const plate = this.add.circle(pos.x, pos.y, 8, COLORS.METAL, 1);
+            plate.setStrokeStyle(1, COLORS.METAL_DARK);
+            container.add(plate);
+            
+            // Center nail/rivet
+            const nail = this.add.circle(pos.x, pos.y, 3, 0x999999, 1);
+            nail.setStrokeStyle(1, 0x777777);
+            container.add(nail);
+        });
+        
+        // Add title if provided
+        if (titleText) {
+            // Create title banner
+            const bannerWidth = width * 0.8;
+            const bannerHeight = 40;
+            const bannerY = -height/2 - 10;
+            
+            const banner = this.add.rectangle(0, bannerY, bannerWidth, bannerHeight, COLORS.WOOD_SECONDARY, 1);
+            banner.setStrokeStyle(3, COLORS.WOOD_BORDER);
+            container.add(banner);
+            
+            // Add title text
+            const title = this.add.text(0, bannerY, titleText, {
+                fontSize: '26px',
+                fontFamily: FONTS.FAMILY,
+                color: COLORS.TEXT,
+                fontStyle: 'bold'
+            }).setOrigin(0.5);
+            title.setShadow(2, 2, '#000000', 2);
+            container.add(title);
+            
+            // Add metal fixtures to banner
+            const bannerCornerOffset = 20;
+            const bannerCornerPositions = [
+                {x: -bannerWidth/2 + bannerCornerOffset, y: bannerY},
+                {x: bannerWidth/2 - bannerCornerOffset, y: bannerY}
+            ];
+            
+            bannerCornerPositions.forEach(pos => {
+                const plateSmall = this.add.circle(pos.x, pos.y, 5, COLORS.METAL, 1);
+                plateSmall.setStrokeStyle(1, COLORS.METAL_DARK);
+                container.add(plateSmall);
+                
+                const nailSmall = this.add.circle(pos.x, pos.y, 2, 0x999999, 1);
+                nailSmall.setStrokeStyle(1, 0x777777);
+                container.add(nailSmall);
+            });
+        }
+        
+        return container;
+    }
+    
+    createWoodenButton(container, x, y, text, width, height, callback) {
+        const { COLORS, FONTS } = this.UI;
+        
+        // Button container for organization
+        const buttonContainer = this.add.container(x, y);
+        
+        // Wooden button background
+        const buttonBg = this.add.rectangle(0, 0, width, height, COLORS.BUTTON_BG, 1);
+        buttonBg.setStrokeStyle(3, COLORS.WOOD_BORDER);
+        buttonContainer.add(buttonBg);
+        
+        // Add wood grain texture (lighter, more subtle)
+        const grainGraphics = this.add.graphics();
+        grainGraphics.lineStyle(1, COLORS.WOOD_GRAIN, 0.15);
+        
+        // Horizontal wood grain lines
+        for (let i = -height/2 + 5; i < height/2; i += 8) {
+            // Make lines slightly wavy
+            grainGraphics.beginPath();
+            grainGraphics.moveTo(-width/2 + 5, i);
+            
+            for (let x = -width/2 + 10; x < width/2; x += 15) {
+                const yOffset = Phaser.Math.Between(-1, 1);
+                grainGraphics.lineTo(x, i + yOffset);
+            }
+            
+            grainGraphics.strokePath();
+        }
+        buttonContainer.add(grainGraphics);
+        
+        // Button text with gold color
+        const buttonText = this.add.text(0, 0, text, {
+            fontSize: '22px',
+            fontFamily: FONTS.FAMILY,
+            color: COLORS.TEXT,
+            fontStyle: 'bold'
+        }).setOrigin(0.5);
+        
+        // Add shadow to text
+        buttonText.setShadow(1, 1, '#000000', 2);
+        buttonContainer.add(buttonText);
+        
+        // Make button interactive
+        buttonBg.setInteractive({ useHandCursor: true });
+        
+        // Hover and click effects
+        buttonBg.on('pointerover', () => {
+            buttonBg.setFillStyle(COLORS.BUTTON_HOVER);
+            buttonContainer.setScale(1.05);
+        });
+        
+        buttonBg.on('pointerout', () => {
+            buttonBg.setFillStyle(COLORS.BUTTON_BG);
+            buttonContainer.setScale(1);
+        });
+        
+        buttonBg.on('pointerdown', () => {
+            // Pressed effect
+            buttonContainer.setScale(0.95);
+            
+            // Play click sound
+            if (audioSystem) {
+                audioSystem.playClick();
+            }
+            
+            // Call the callback
+            if (callback) {
+                callback();
+            }
+        });
+        
+        // Add the button container to the parent container
+        container.add(buttonContainer);
+        
+        return buttonContainer;
+    }
 
     setupRockPaperScissors() {
         const { width: w, height: h } = this.cameras.main;
         this.rpsGameActive = true;
+        
+        // Create spectators for tie scenario
+        this.createSpectators();
         
         // Initialize weapon system and skin system
         this.weaponSystem = new WeaponSystem(this);
@@ -83,6 +328,7 @@ class OutcomeScene extends Phaser.Scene {
         
         // Create player container starting from left
         this.playerContainer = this.add.container(-100, h/2 + 175);
+        this.playerContainer.setDepth(10); // Set depth higher than spectators but lower than UI
         const playerSkinKey = skinSystem.getSkinTextureKey(this.currentSkin);
         const player = this.add.sprite(0, 0, playerSkinKey).setScale(0.75);
         player.setOrigin(0.5);
@@ -94,6 +340,7 @@ class OutcomeScene extends Phaser.Scene {
         
         // Create opponent container starting from right
         this.opponentContainer = this.add.container(w + 100, h/2 + 175);
+        this.opponentContainer.setDepth(10); // Set depth higher than spectators but lower than UI
         const opponentSkinKey = skinSystem.getSkinTextureKey(this.opponentSkin);
         const opponent = this.add.sprite(0, 0, opponentSkinKey).setScale(0.75);
         opponent.setOrigin(0.5);
@@ -132,289 +379,568 @@ class OutcomeScene extends Phaser.Scene {
         });
     }
 
-    showRockPaperScissorsUI() {
+    // Add spectators for tie scenario
+    createSpectators() {
         const { width: w, height: h } = this.cameras.main;
         
-        // Create title text
-        const textStyle = {
-            fontSize: '64px',
-            fontFamily: 'Arial',
-            color: '#ffffff',
-            stroke: '#000000',
-            strokeThickness: 4
-        };
+        // Create spectators positioned higher up
+        const spectatorY = h/2 + 100;
+        const spectatorCount = 15;
         
-        this.add.text(w/2, h/4, 'TIE!', {
-            ...textStyle,
-            color: '#ffff00'  // Yellow for tie
-        }).setOrigin(0.5);
+        this.spectators = [];
         
-        this.add.text(w/2, h/4 + 80, 'Choose Rock, Paper, or Scissors to break the tie', {
-            fontSize: '32px',
-            fontFamily: 'Arial',
-            color: '#ffffff',
-            stroke: '#000000',
-            strokeThickness: 2
-        }).setOrigin(0.5);
+        // Initialize skin system to use actual character skins
+        const skinSystem = new SkinSystem(this);
         
-        // Create score display
-        this.add.text(w/2, h/4 + 140, `${this.finalScore} - ${this.opponentScore}`, {
-            fontSize: '48px',
-            fontFamily: 'Arial',
-            color: '#ffffff',
-            stroke: '#000000',
-            strokeThickness: 3
-        }).setOrigin(0.5);
+        // Available skin keys to use for spectators
+        const skinOptions = [
+            'sheep1_default', 
+            'sheep1_sunglass', 
+            'sheep1_tophat', 
+            'sheep1_bling',
+            'sheep2_default',
+            'ram_default'
+        ];
         
-        // Create prompt texts above each character
-        this.playerPrompt = this.add.text(w/4, h/2, 'Your Choice:', {
+        // Create spectator group (randomly placed)
+        for (let i = 0; i < spectatorCount; i++) {
+            // Randomly distribute along the X axis but avoid the center
+            let x;
+            if (Math.random() > 0.5) {
+                // Right side
+                x = (w * 0.6) + (Math.random() * w * 0.35);
+            } else {
+                // Left side
+                x = (Math.random() * w * 0.35);
+            }
+            
+            // Randomize Y position slightly for varied heights
+            const randomY = spectatorY - (Math.random() * 15);
+            
+            // Pick a random skin
+            const skinKey = skinOptions[Math.floor(Math.random() * skinOptions.length)];
+            
+            // Create spectator using actual character sprite
+            const spectator = this.add.sprite(x, randomY, skinKey);
+            
+            // Scale down the spectators
+            const scale = 0.3 + (Math.random() * 0.15);
+            spectator.setScale(scale);
+            
+            // Set depth to be behind players and UI (lower value)
+            spectator.setDepth(5);
+            
+            // Randomly flip some spectators
+            if (Math.random() > 0.5) {
+                spectator.setFlipX(true);
+            }
+            
+            // Create spectator animation
+            const animationType = Math.floor(Math.random() * 3); // 0, 1, or 2
+            
+            switch (animationType) {
+                case 0: // Up and down
+                    this.tweens.add({
+                        targets: spectator,
+                        y: '-=5',
+                        duration: 500 + Math.random() * 500,
+                        yoyo: true,
+                        repeat: -1,
+                        ease: 'Sine.easeInOut',
+                        delay: Math.random() * 1000
+                    });
+                    break;
+                case 1: // Side to side
+                    this.tweens.add({
+                        targets: spectator,
+                        x: '+=10',
+                        duration: 1000 + Math.random() * 500,
+                        yoyo: true,
+                        repeat: -1,
+                        ease: 'Sine.easeInOut',
+                        delay: Math.random() * 1000
+                    });
+                    break;
+                case 2: // Scaling/bouncing
+                    this.tweens.add({
+                        targets: spectator,
+                        scaleY: spectator.scaleY * 1.1,
+                        duration: 300 + Math.random() * 200,
+                        yoyo: true,
+                        repeat: -1,
+                        ease: 'Sine.easeInOut',
+                        delay: Math.random() * 1000
+                    });
+                    break;
+            }
+            
+            // Store reference to clean up later
+            this.spectators.push(spectator);
+        }
+        
+        // Play crowd sound
+        if (audioSystem) {
+            audioSystem.playSfx('crowd_sheep', { volume: 0.3, loop: true });
+        }
+    }
+
+    showRockPaperScissorsUI() {
+        const { width: w, height: h } = this.cameras.main;
+        const { COLORS, FONTS } = this.UI;
+        
+        // Create a medieval wooden panel for the tie-breaker
+        const panelWidth = 600;
+        const panelHeight = 400;
+        
+        // Create the panel with decorative elements
+        this.rpsPanel = this.createWoodenPanel(w/2, h/2, panelWidth, panelHeight, "JOUSTING TIE!");
+        this.rpsPanel.setDepth(20); // Set UI depth higher than players and spectators
+        
+        // Add instruction text
+        const instructionText = this.add.text(0, -120, 
+            'Choose thy weapon to break the tie:', {
             fontSize: '24px',
-            fontFamily: 'Arial',
-            color: '#ffffff',
+            fontFamily: FONTS.FAMILY,
+            color: COLORS.TEXT_SECONDARY,
             stroke: '#000000',
-            strokeThickness: 2
+            strokeThickness: 1
         }).setOrigin(0.5);
+        this.rpsPanel.add(instructionText);
         
-        this.opponentPrompt = this.add.text(3*w/4, h/2, 'Opponent\'s Choice:', {
-            fontSize: '24px',
-            fontFamily: 'Arial',
-            color: '#ffffff',
+        // Create medieval-styled score display
+        const scoreText = this.add.text(0, -70, 
+            `${this.finalScore} - ${this.opponentScore}`, {
+            fontSize: '36px',
+            fontStyle: 'bold',
+            fontFamily: FONTS.FAMILY,
+            color: COLORS.TEXT,
             stroke: '#000000',
             strokeThickness: 2
         }).setOrigin(0.5);
+        scoreText.setShadow(1, 1, '#000000', 2);
+        this.rpsPanel.add(scoreText);
         
-        // Create choice displays (initially empty)
-        this.playerChoiceText = this.add.text(w/4, h/2 + 30, '', {
-            fontSize: '32px',
-            fontFamily: 'Arial',
-            color: '#00ffff',
+        // Player choice display
+        this.playerChoiceText = this.add.text(-100, 20, '', {
+            fontSize: '28px',
+            fontFamily: FONTS.FAMILY,
+            fontStyle: 'bold',
+            color: COLORS.TEXT,
             stroke: '#000000',
-            strokeThickness: 2
+            strokeThickness: 1
         }).setOrigin(0.5);
+        this.playerChoiceText.setShadow(1, 1, '#000000', 2);
+        this.rpsPanel.add(this.playerChoiceText);
         
-        this.opponentChoiceText = this.add.text(3*w/4, h/2 + 30, '???', {
-            fontSize: '32px',
-            fontFamily: 'Arial',
-            color: '#ff00ff',
-            stroke: '#000000',
-            strokeThickness: 2
+        // Player label
+        this.playerPrompt = this.add.text(-100, -20, 'YOUR CHOICE:', {
+            fontSize: '20px',
+            fontFamily: FONTS.FAMILY,
+            fontStyle: 'bold',
+            color: COLORS.TEXT_SECONDARY
         }).setOrigin(0.5);
+        this.rpsPanel.add(this.playerPrompt);
+        
+        // Opponent choice display
+        this.opponentChoiceText = this.add.text(100, 20, '???', {
+            fontSize: '28px',
+            fontFamily: FONTS.FAMILY,
+            fontStyle: 'bold',
+            color: COLORS.TEXT,
+            stroke: '#000000',
+            strokeThickness: 1
+        }).setOrigin(0.5);
+        this.opponentChoiceText.setShadow(1, 1, '#000000', 2);
+        this.rpsPanel.add(this.opponentChoiceText);
+        
+        // Opponent label
+        this.opponentPrompt = this.add.text(100, -20, 'OPPONENT:', {
+            fontSize: '20px',
+            fontFamily: FONTS.FAMILY,
+            fontStyle: 'bold',
+            color: COLORS.TEXT_SECONDARY
+        }).setOrigin(0.5);
+        this.rpsPanel.add(this.opponentPrompt);
         
         // Create RPS buttons
         this.createRPSButtons();
     }
     
     createRPSButtons() {
-        const { width: w, height: h } = this.cameras.main;
-        const buttonY = h * 0.75;
-        const spacing = 180;
+        const { COLORS, FONTS } = this.UI;
+        const buttonY = 100;
+        const spacing = 130;
         
-        // Button style
-        const buttonStyle = {
-            fontSize: '32px',
-            fontFamily: 'Arial',
-            color: '#ffffff',
-            backgroundColor: '#444444',
-            padding: { x: 20, y: 10 },
-            stroke: '#000000',
-            strokeThickness: 2
-        };
+        // Create a container for all buttons
+        this.rpsButtonsContainer = this.add.container(0, buttonY);
+        this.rpsPanel.add(this.rpsButtonsContainer);
         
-        // Create rock button
-        const rockButton = this.add.text(w/2 - spacing, buttonY, '🪨 Rock', buttonStyle)
-            .setOrigin(0.5)
-            .setInteractive();
-            
-        rockButton.on('pointerover', () => {
-            rockButton.setBackgroundColor('#666666');
-            rockButton.setScale(1.1);
-        });
+        // Define button properties
+        const buttonWidth = 120;
+        const buttonHeight = 50;
         
-        rockButton.on('pointerout', () => {
-            rockButton.setBackgroundColor('#444444');
-            rockButton.setScale(1);
-        });
+        // Create medieval-styled wooden buttons
+        const rockButton = this.createWoodenButton(
+            this.rpsButtonsContainer,
+            -spacing,
+            0,
+            'ROCK',
+            buttonWidth,
+            buttonHeight,
+            () => this.makeRPSChoice('Rock')
+        );
         
-        rockButton.on('pointerdown', () => {
-            this.makeRPSChoice('Rock');
-        });
+        const paperButton = this.createWoodenButton(
+            this.rpsButtonsContainer,
+            0,
+            0,
+            'PAPER',
+            buttonWidth,
+            buttonHeight,
+            () => this.makeRPSChoice('Paper')
+        );
         
-        // Create paper button
-        const paperButton = this.add.text(w/2, buttonY, '📄 Paper', buttonStyle)
-            .setOrigin(0.5)
-            .setInteractive();
-            
-        paperButton.on('pointerover', () => {
-            paperButton.setBackgroundColor('#666666');
-            paperButton.setScale(1.1);
-        });
+        const scissorsButton = this.createWoodenButton(
+            this.rpsButtonsContainer,
+            spacing,
+            0,
+            'SCISSORS',
+            buttonWidth,
+            buttonHeight,
+            () => this.makeRPSChoice('Scissors')
+        );
         
-        paperButton.on('pointerout', () => {
-            paperButton.setBackgroundColor('#444444');
-            paperButton.setScale(1);
-        });
-        
-        paperButton.on('pointerdown', () => {
-            this.makeRPSChoice('Paper');
-        });
-        
-        // Create scissors button
-        const scissorsButton = this.add.text(w/2 + spacing, buttonY, '✂️ Scissors', buttonStyle)
-            .setOrigin(0.5)
-            .setInteractive();
-            
-        scissorsButton.on('pointerover', () => {
-            scissorsButton.setBackgroundColor('#666666');
-            scissorsButton.setScale(1.1);
-        });
-        
-        scissorsButton.on('pointerout', () => {
-            scissorsButton.setBackgroundColor('#444444');
-            scissorsButton.setScale(1);
-        });
-        
-        scissorsButton.on('pointerdown', () => {
-            this.makeRPSChoice('Scissors');
-        });
-        
-        // Store buttons in an array for disabling later
-        this.rpsButtons = [rockButton, paperButton, scissorsButton];
+        // Store buttons for disabling later (find the rectangle backgrounds)
+        this.rpsButtons = [
+            { 
+                background: rockButton.list[0], 
+                text: rockButton.list.find(item => item.type === 'Text'),
+                choice: 'Rock' 
+            },
+            { 
+                background: paperButton.list[0], 
+                text: paperButton.list.find(item => item.type === 'Text'),
+                choice: 'Paper' 
+            },
+            { 
+                background: scissorsButton.list[0], 
+                text: scissorsButton.list.find(item => item.type === 'Text'),
+                choice: 'Scissors' 
+            }
+        ];
     }
     
     makeRPSChoice(choice) {
-        if (!this.rpsGameActive) return;
+        if (!this.rpsGameActive || this.rpsResultProcessing) return;
+        
+        // Play click sound
+        if (audioSystem) {
+            audioSystem.playClick();
+        }
         
         // Set player choice
         this.playerChoice = choice;
         this.playerChoiceText.setText(choice);
         
         // Disable and hide buttons after choice is made
-        this.rpsButtons.forEach(button => {
-            button.setVisible(false);
-        });
+        this.rpsButtonsContainer.setVisible(false);
         
         // Delay opponent choice for suspense
         this.time.delayedCall(1000, () => {
-            // Generate opponent choice randomly
+            if (!this.scene.isActive()) return; // Check if scene is still active
+            
+            // Generate opponent choice randomly - ensure it's different each time
             const choices = ['Rock', 'Paper', 'Scissors'];
+            
+            // If there's a previous opponent choice and it resulted in a tie,
+            // remove it from possible choices to ensure variation
+            if (this.opponentChoice && this.opponentChoice === this.playerChoice) {
+                choices.splice(choices.indexOf(this.opponentChoice), 1);
+            }
+            
+            // Get random choice from remaining options
             this.opponentChoice = choices[Math.floor(Math.random() * choices.length)];
-            this.opponentChoiceText.setText(this.opponentChoice);
+            
+            if (this.opponentChoiceText && this.opponentChoiceText.active) {
+                this.opponentChoiceText.setText(this.opponentChoice);
+            }
+            
+            // Play opponent choice sound
+            if (audioSystem) {
+                audioSystem.playSfx('baa', { volume: 0.7 });
+            }
             
             // Delay result calculation for dramatic effect
             this.time.delayedCall(1000, () => {
+                if (!this.scene.isActive()) return; // Check if scene is still active
                 this.calculateRPSResult();
             });
         });
     }
     
     calculateRPSResult() {
-        // Calculate who won
-        let playerWins = false;
+        // Prevent multiple calls during processing
+        if (this.rpsResultProcessing) return;
+        this.rpsResultProcessing = true;
+        this.rpsGameActive = false;
         
+        const { width: w, height: h } = this.cameras.main;
+        const { COLORS, FONTS } = this.UI;
+        
+        let result;
+        let resultText;
+        let resultColor;
+        
+        // Determine winner based on RPS rules
         if (this.playerChoice === this.opponentChoice) {
-            // Another tie - restart RPS game
-            this.showRPSResult('Tie! Play again.');
+            result = 'tie';
+            resultText = 'A STALEMATE!';
+            resultColor = COLORS.TEXT;
+            
+            // Play sounds for tie
+            if (audioSystem) {
+                // Instead of using a non-existent 'tie' sound, use existing sounds with modifications
+                audioSystem.playSfx('baa', { volume: 0.6, detune: -300 });
+                
+                // Play crowd murmurs
+                audioSystem.playSfx('crowd_sheep', { volume: 0.5 });
+                
+                // Also play a UI sound
+                this.time.delayedCall(200, () => {
+                    audioSystem.playClick();
+                });
+            }
+            
+            // Animate spectators for tie (mixed reactions)
+            this.animateSpectators('mixed');
+            
+            // Reset the game for another round after a delay
             this.time.delayedCall(2000, () => {
                 this.resetRPSGame();
+                // Allow new game cycle to start
+                this.rpsResultProcessing = false;
+                this.rpsGameActive = true;
             });
-            return;
+            
         } else if (
             (this.playerChoice === 'Rock' && this.opponentChoice === 'Scissors') ||
             (this.playerChoice === 'Paper' && this.opponentChoice === 'Rock') ||
             (this.playerChoice === 'Scissors' && this.opponentChoice === 'Paper')
         ) {
-            playerWins = true;
-        }
-        
-        // Set the winner
-        this.won = playerWins;
-        this.rpsGameActive = false;
-        
-        // Show result
-        this.showRPSResult(playerWins ? 'You win!' : 'Opponent wins!');
-        
-        // Remove tutorial text and choice prompts
-        this.clearRPSInstructionTexts();
-        
-        // Delay transition to result screen
-        this.time.delayedCall(2000, () => {
-            this.showGameOverUI();
-        });
-    }
-    
-    clearRPSInstructionTexts() {
-        // Remove all instruction and prompt texts immediately
-        this.children.list.forEach(child => {
-            if (child.text) {
-                // Check for tutorial and instruction texts
-                if (child.text.includes('Choose Rock, Paper, or Scissors') ||
-                    child.text === 'Your Choice:' ||
-                    child.text === "Opponent's Choice:" ||
-                    // Also remove the score text by checking for hyphen between numbers pattern
-                    /^\d+\s*-\s*\d+$/.test(child.text) ||
-                    child.text === 'TIE!') {
-                    child.destroy();
-                }
-            }
-        });
-        
-        // Hide the choice text displays after a short delay (so player can still see the final choices)
-        this.time.delayedCall(1500, () => {
-            if (this.playerChoiceText) this.playerChoiceText.setVisible(false);
-            if (this.opponentChoiceText) this.opponentChoiceText.setVisible(false);
+            result = 'win';
+            resultText = 'VICTORY IS YOURS!';
+            resultColor = '#00AA00';
             
-            // Also ensure the player prompt texts are removed (redundant check for safety)
-            this.children.list.forEach(child => {
-                if (child.text) {
-                    if (child.text === 'Your Choice:' || child.text === "Opponent's Choice:") {
-                        child.destroy();
-                    }
-                }
+            // Update scores
+            this.finalScore += 1;
+            
+            // Animate spectators with excitement
+            this.animateSpectators('excited');
+            
+            // Play victory sound
+            if (audioSystem) {
+                // First play the crowd cheer
+                audioSystem.playSfx('crowdCheer', { volume: 0.6 });
+                
+                // Then play baa sound for the victory sheep
+                this.time.delayedCall(100, () => {
+                    audioSystem.playSfx('baa', { volume: 0.7, detune: 200 });
+                });
+                
+                // Also play lance hit for impact
+                this.time.delayedCall(50, () => {
+                    audioSystem.playSfx('lanceHit', { volume: 0.6 });
+                });
+            }
+            
+            // Show game UI after short delay
+            this.time.delayedCall(2500, () => {
+                this.showGameOverUI('win');
             });
+            
+        } else {
+            result = 'lose';
+            resultText = 'THE OPPONENT PREVAILS!';
+            resultColor = '#AA0000';
+            
+            // Update scores
+            this.opponentScore += 1;
+            
+            // Animate spectators with disappointment
+            this.animateSpectators('disappointed');
+            
+            // Play defeat sound
+            if (audioSystem) {
+                // Play disappointed crowd sound
+                audioSystem.playSfx('crowd_sheep', { volume: 0.5 });
+                
+                // Play sad baa
+                this.time.delayedCall(200, () => {
+                    audioSystem.playSfx('baa', { volume: 0.6, detune: -500 });
+                });
+                
+                // Also play lance hit for impact
+                this.time.delayedCall(50, () => {
+                    audioSystem.playSfx('lanceHit', { volume: 0.5 });
+                });
+            }
+            
+            // Show game UI after short delay
+            this.time.delayedCall(2500, () => {
+                this.showGameOverUI('lose');
+            });
+        }
+        
+        // Create a clean text result display without banners
+        const resultText1 = this.add.text(w/2, h/2 - 50, resultText, {
+            fontSize: '40px',
+            fontStyle: 'bold',
+            fontFamily: FONTS.FAMILY,
+            color: resultColor,
+            stroke: '#000000',
+            strokeThickness: 2,
+            align: 'center'
+        }).setOrigin(0.5);
+        resultText1.setDepth(25); // Set depth higher than UI
+        
+        // Add to resultTexts array for cleanup
+        this.resultTexts.push(resultText1);
+        
+        // Add soft shadow to text for better readability
+        const shadowText = this.add.text(w/2 + 2, h/2 - 50 + 2, resultText, {
+            fontSize: '40px',
+            fontStyle: 'bold',
+            fontFamily: FONTS.FAMILY,
+            color: '#000000',
+            align: 'center'
+        }).setOrigin(0.5);
+        shadowText.setAlpha(0.3);
+        shadowText.setDepth(24); // Just below the main text
+        this.resultTexts.push(shadowText);
+        
+        // Animate text appearance
+        this.tweens.add({
+            targets: [resultText1, shadowText],
+            scaleX: { from: 0.2, to: 1 },
+            scaleY: { from: 0.2, to: 1 },
+            ease: 'Back.out',
+            duration: 500
         });
     }
     
-    showRPSResult(message) {
-        const { width: w, height: h } = this.cameras.main;
+    // Add spectator animation method for tie scenario
+    animateSpectators(reaction) {
+        if (!this.spectators || this.spectators.length === 0) return;
         
-        // Remove any previous result text to avoid overlay
-        this.children.list.forEach(child => {
-            if (child.text && (child.text.includes('You win') || child.text.includes('Opponent wins') || child.text.includes('Tie! Play again'))) {
-                child.destroy();
+        // Make spectators react based on outcome
+        this.spectators.forEach(spectator => {
+            // Clear any existing tweens
+            this.tweens.killTweensOf(spectator);
+            
+            if (reaction === 'excited') {
+                // Excited jump animation
+                const jumpHeight = 15 + Math.random() * 20;
+                
+                // Create jumping animation
+                this.tweens.add({
+                    targets: spectator,
+                    y: `-=${jumpHeight}`,
+                    duration: 300,
+                    yoyo: true,
+                    repeat: 3,
+                    ease: 'Sine.easeOut'
+                });
+                
+                // Add rotation for extra excitement
+                this.tweens.add({
+                    targets: spectator,
+                    angle: spectator.flipX ? -10 : 10,
+                    duration: 200,
+                    yoyo: true,
+                    repeat: 5,
+                    ease: 'Sine.easeInOut'
+                });
+                
+                // Scale up and down rapidly (bouncing with excitement)
+                this.tweens.add({
+                    targets: spectator,
+                    scaleY: spectator.scaleY * 1.15,
+                    duration: 200,
+                    yoyo: true,
+                    repeat: 5,
+                    ease: 'Sine.easeInOut'
+                });
+            } else if (reaction === 'disappointed') {
+                // Disappointed/subdued animation
+                
+                // Slump down slightly
+                this.tweens.add({
+                    targets: spectator,
+                    y: `+=${3 + Math.random() * 5}`,
+                    duration: 500,
+                    ease: 'Sine.easeOut'
+                });
+                
+                // Shrink slightly (hunching down)
+                this.tweens.add({
+                    targets: spectator,
+                    scaleY: spectator.scaleY * 0.9,
+                    scaleX: spectator.scaleX * 0.95,
+                    duration: 500,
+                    ease: 'Sine.easeOut'
+                });
+                
+                // Slight side-to-side shake (head shake of disappointment)
+                this.tweens.add({
+                    targets: spectator,
+                    x: `+=${spectator.flipX ? -3 : 3}`,
+                    duration: 300,
+                    yoyo: true,
+                    repeat: 2,
+                    ease: 'Sine.easeInOut'
+                });
+            } else if (reaction === 'mixed') {
+                // For tie results, create mixed reactions
+                // Some spectators are excited, some disappointed
+                if (Math.random() > 0.5) {
+                    // Mild excitement - small hops
+                    this.tweens.add({
+                        targets: spectator,
+                        y: `-=${5 + Math.random() * 10}`,
+                        duration: 200,
+                        yoyo: true,
+                        repeat: 2,
+                        ease: 'Sine.easeOut'
+                    });
+                    
+                    // Small rotation
+                    this.tweens.add({
+                        targets: spectator,
+                        angle: spectator.flipX ? -5 : 5,
+                        duration: 150,
+                        yoyo: true,
+                        repeat: 3,
+                        ease: 'Sine.easeInOut'
+                    });
+                } else {
+                    // Mild disappointment - small slump
+                    this.tweens.add({
+                        targets: spectator,
+                        y: `+=${2 + Math.random() * 3}`,
+                        duration: 300,
+                        ease: 'Sine.easeOut'
+                    });
+                    
+                    // Small scale change
+                    this.tweens.add({
+                        targets: spectator,
+                        scaleY: spectator.scaleY * 0.95,
+                        duration: 300,
+                        ease: 'Sine.easeOut'
+                    });
+                }
             }
         });
-        
-        // Create result text with animation
-        const resultText = this.add.text(w/2, h/2 + 200, message, {
-            fontSize: '48px',
-            fontFamily: 'Arial',
-            color: message.includes('Tie') ? '#ffff00' : (message.includes('You win') ? '#00ff00' : '#ff0000'),
-            stroke: '#000000',
-            strokeThickness: 3
-        }).setOrigin(0.5);
-        
-        // Animate result text
-        this.tweens.add({
-            targets: resultText,
-            scale: 1.3,
-            duration: 300,
-            yoyo: true,
-            repeat: 1
-        });
-        
-        // Make the result text fade away after a few seconds (if not a tie)
-        if (!message.includes('Tie')) {
-            this.time.delayedCall(3000, () => {
-                this.tweens.add({
-                    targets: resultText,
-                    alpha: 0,
-                    duration: 500,
-                    onComplete: () => {
-                        resultText.destroy();
-                    }
-                });
-            });
-        }
     }
     
     resetRPSGame() {
@@ -422,150 +948,204 @@ class OutcomeScene extends Phaser.Scene {
         this.playerChoice = null;
         this.opponentChoice = null;
         
-        // Reset text displays and make them visible again
-        if (this.playerChoiceText) {
+        // Reset text displays if they exist
+        if (this.playerChoiceText && this.playerChoiceText.active) {
             this.playerChoiceText.setText('');
-            this.playerChoiceText.setVisible(true);
         }
         
-        if (this.opponentChoiceText) {
+        if (this.opponentChoiceText && this.opponentChoiceText.active) {
             this.opponentChoiceText.setText('???');
-            this.opponentChoiceText.setVisible(true);
         }
         
-        // Make buttons visible again
-        this.rpsButtons.forEach(button => {
-            button.setVisible(true);
-            button.setInteractive();
-            button.setBackgroundColor('#444444');
-            button.setAlpha(1);
-            button.setScale(1);
-        });
+        // Make buttons visible again if they exist
+        if (this.rpsButtonsContainer && this.rpsButtonsContainer.active) {
+            this.rpsButtonsContainer.setVisible(true);
+        }
         
-        // Remove any result text
-        this.children.list.forEach(child => {
-            if (child.text && (child.text.includes('You win') || child.text.includes('Opponent wins') || child.text.includes('Tie! Play again'))) {
-                child.destroy();
+        // Reset button colors if they exist
+        if (this.rpsButtons && this.rpsButtons.length > 0) {
+            this.rpsButtons.forEach(button => {
+                if (button.background && button.background.active) {
+                    button.background.setFillStyle(this.UI.COLORS.BUTTON);
+                }
+                if (button.text && button.text.active) {
+                    button.text.setScale(1);
+                }
+            });
+        }
+        
+        // Clean up result texts safely
+        if (this.resultTexts && this.resultTexts.length > 0) {
+            this.resultTexts.forEach(text => {
+                if (text && text.active) {
+                    text.destroy();
+                }
+            });
+            this.resultTexts = [];
+        }
+        
+        // Update the score display if RPS panel exists
+        if (this.rpsPanel && this.rpsPanel.active) {
+            // Look for score text in the panel
+            const scoreObjects = this.rpsPanel.list.filter(obj => 
+                obj.type === 'Text' && 
+                obj.text && 
+                obj.text.includes('-') && 
+                obj.text.length <= 7); // Assuming score text is short like "3 - 2"
+            
+            // Update the first matching text object
+            if (scoreObjects.length > 0) {
+                scoreObjects[0].setText(`${this.finalScore} - ${this.opponentScore}`);
             }
-        });
+        }
     }
 
-    showGameOverUI() {
+    showGameOverUI(result) {
         const { width: w, height: h } = this.cameras.main;
         const centerX = w / 2;
         const centerY = h / 2;
-
-        // Clear ALL previous UI elements to prevent overlay
-        this.children.list.forEach(child => {
-            // Don't remove the background or player/opponent containers
-            if (child.type !== 'Image' && 
-                child !== this.playerContainer && 
-                child !== this.opponentContainer && 
-                child.texture && child.texture.key !== 'bg') {
-                child.destroy();
-            }
-        });
+        const { COLORS, FONTS } = this.UI;
         
-        // Ensure we disable RPS game state
-        this.rpsGameActive = false;
-
-        // Create text style
-        const textStyle = {
-            fontSize: '64px',
-            fontFamily: 'Arial',
-            color: '#ffffff',
+        // Create a container for the game over UI
+        const container = this.add.container(centerX, centerY);
+        container.setDepth(30); // Set higher depth to ensure it appears above everything
+        
+        // Determine if player won based on result parameter or score comparison
+        let playerWon = false;
+        
+        if (result === 'win') {
+            playerWon = true;
+        } else if (result === 'lose') {
+            playerWon = false;
+        } else {
+            // If no specific result provided, determine by score
+            playerWon = this.finalScore > this.opponentScore;
+        }
+        
+        // Create medieval-styled wooden panel with appropriate title
+        const titleText = playerWon ? 'VICTORY!' : 'DEFEAT!';
+        const panelWidth = 420;
+        const panelHeight = 320;
+        
+        // Create the wooden panel
+        const gameOverPanel = this.createWoodenPanel(0, 0, panelWidth, panelHeight, titleText);
+        container.add(gameOverPanel);
+        
+        // Show score display with medieval styling
+        const scoreText = this.add.text(0, -90, `${this.finalScore} - ${this.opponentScore}`, {
+            fontSize: '38px',
+            fontFamily: FONTS.FAMILY,
+            fontStyle: 'bold',
+            color: COLORS.TEXT,
             stroke: '#000000',
-            strokeThickness: 4
-        };
-
-        // Create title
-        this.add.text(centerX, centerY - 150, this.won ? 'Victory!' : 'Defeat!', {
-            ...textStyle,
-            color: this.won ? '#00ff00' : '#ff0000'
+            strokeThickness: 2
         }).setOrigin(0.5);
-
-        // Create score displays
-        this.add.text(centerX, centerY - 50, `Your Score: ${this.finalScore}`, {
-            ...textStyle,
-            fontSize: '48px'
-        }).setOrigin(0.5);
-
-        this.add.text(centerX, centerY, `Opponent Score: ${this.opponentScore}`, {
-            ...textStyle,
-            fontSize: '48px'
-        }).setOrigin(0.5);
-
-        // If it was a tie originally, show that it was decided by RPS
-        if (this.finalScore === this.opponentScore) {
-            this.add.text(centerX, centerY + 50, `Tie broken by Rock-Paper-Scissors!`, {
-                ...textStyle,
-                fontSize: '32px'
-            }).setOrigin(0.5);
-        }
-
-        // Create opponent info text if available (for both quick match and career modes)
-        if (this.opponentId) {
+        scoreText.setShadow(1, 1, '#000000', 2);
+        gameOverPanel.add(scoreText);
+        
+        // Calculate reward
+        let moneyEarned = 0;
+        
+        // Different money calculation based on match type
+        if (this.matchType === 'career' && playerWon) {
+            // Use enemy system to get proper money reward
             const enemySystem = new EnemySystem(this);
-            const enemy = enemySystem.getEnemy(this.opponentId);
             
-            if (enemy) {
-                this.add.text(centerX, this.finalScore === this.opponentScore ? centerY + 100 : centerY + 50, `Opponent: ${enemy.name}`, {
-                    ...textStyle,
-                    fontSize: '32px'
-                }).setOrigin(0.5);
+            // Get the enemy data using the opponent ID
+            if (this.opponentId) {
+                const enemy = enemySystem.getEnemy(this.opponentId);
+                
+                // Calculate reward based on score
+                moneyEarned = enemy.calculateMoneyReward(this.finalScore);
+                // Update career progression
+                playerState.updateCareerProgress(this.opponentId, true, { moneyReward: moneyEarned });
             }
+        } else if (playerWon) {
+            // For quick match, give a base reward + bonus for score
+            moneyEarned = 30 + (this.finalScore * 3);
+        } else if (!playerWon && this.finalScore > 0) {
+            // Small consolation prize if player scored some points
+            moneyEarned = Math.floor(this.finalScore * 1.5);
         }
-
-        // Show money rewards for career mode
-        if (this.matchType === 'career' && this.won) {
-            this.handleCareerRewards();
+        
+        // Ensure money is added to player state
+        if (moneyEarned > 0) {
+            playerState.updateMoney(moneyEarned);
         }
-
-        // Create return to hub button
-        const returnButton = this.add.text(centerX, this.finalScore === this.opponentScore ? centerY + 170 : centerY + 120, 'Return to Hub', {
-            ...textStyle,
-            fontSize: '32px'
-        }).setOrigin(0.5).setInteractive();
-
-        // Add hover effect
-        returnButton.on('pointerover', () => {
-            returnButton.setScale(1.2);
-        });
-
-        returnButton.on('pointerout', () => {
-            returnButton.setScale(1);
-        });
-
-        // Add click handler
-        returnButton.on('pointerdown', () => {
-            // Update player stats using the global PlayerState
-            playerState.updateStats(this.finalScore, this.won);
-            playerState.updateRankAndLeagues();
-            this.scene.start('MainLoop');
-        });
-
-        // Create return to main menu button
-        const mainMenuButton = this.add.text(centerX, this.finalScore === this.opponentScore ? centerY + 220 : centerY + 170, 'Return to Main Menu', {
-            ...textStyle,
-            fontSize: '32px'
-        }).setOrigin(0.5).setInteractive();
-
-        // Add hover effect
-        mainMenuButton.on('pointerover', () => {
-            mainMenuButton.setScale(1.2);
-        });
-
-        mainMenuButton.on('pointerout', () => {
-            mainMenuButton.setScale(1);
-        });
-
-        // Add click handler
-        mainMenuButton.on('pointerdown', () => {
-            this.scene.start('MainMenu');
+        
+        // Show reward if there is one
+        if (moneyEarned > 0) {
+            const rewardText = this.add.text(0, -25, `+$${moneyEarned}`, {
+                fontSize: '32px',
+                fontFamily: FONTS.FAMILY,
+                fontStyle: 'bold',
+                color: COLORS.TEXT,
+                stroke: '#000000',
+                strokeThickness: 1
+            }).setOrigin(0.5);
+            rewardText.setShadow(1, 1, '#FFD700', 1);
+            gameOverPanel.add(rewardText);
+        }
+        
+        // Create a wooden continue button
+        this.createWoodenButton(
+            gameOverPanel,
+            0,
+            70,
+            'CONTINUE',
+            200,
+            50,
+            () => {
+                // Play click sound handled by the button
+                
+                // Stop all crowd sounds
+                if (audioSystem && audioSystem.sfx) {
+                    if (audioSystem.sfx.crowdCheer) {
+                        audioSystem.sfx.crowdCheer.stop();
+                    }
+                    if (audioSystem.sfx.crowd_sheep) {
+                        audioSystem.sfx.crowd_sheep.stop();
+                    }
+                    if (audioSystem.sfx.baa) {
+                        audioSystem.sfx.baa.stop();
+                    }
+                }
+                
+                // Update player stats using the global PlayerState
+                playerState.updateStats(this.finalScore, playerWon);
+                playerState.updateRankAndLeagues();
+                this.scene.start('MainLoop');
+            }
+        );
+        
+        // Simple fade-in animation
+        container.setAlpha(0);
+        this.tweens.add({
+            targets: container,
+            alpha: 1,
+            duration: 300
         });
     }
 
     shutdown() {
+        // Make sure all sounds are stopped when scene is shut down
+        if (audioSystem && audioSystem.sfx) {
+            // Explicitly stop common sounds
+            const soundKeys = ['crowdCheer', 'crowd_sheep', 'baa', 'lanceHit'];
+            soundKeys.forEach(key => {
+                if (audioSystem.sfx[key]) {
+                    audioSystem.sfx[key].stop();
+                }
+            });
+            
+            // Fade out other sounds
+            audioSystem.fadeOutAllSounds(500);
+        }
+        
+        // Stop all tweens
+        this.tweens.killAll();
+        
+        // Clean up tweens for player and opponent
         if (this.playerTween) {
             this.playerTween.stop();
             this.playerTween = null;
@@ -574,9 +1154,53 @@ class OutcomeScene extends Phaser.Scene {
             this.opponentTween.stop();
             this.opponentTween = null;
         }
-        // Clean up when scene is shut down
+        
+        // Clean up jousting outcome
         if (this.joustingOutcome) {
             this.joustingOutcome.destroy();
+            this.joustingOutcome = null;
+        }
+        
+        // Clean up RPS UI elements
+        if (this.rpsPanel) {
+            this.rpsPanel.destroy();
+            this.rpsPanel = null;
+        }
+        
+        if (this.rpsButtonsContainer) {
+            this.rpsButtonsContainer.destroy();
+            this.rpsButtonsContainer = null;
+        }
+        
+        // Clean up player and opponent containers if they exist
+        if (this.playerContainer) {
+            this.playerContainer.destroy();
+            this.playerContainer = null;
+        }
+        
+        if (this.opponentContainer) {
+            this.opponentContainer.destroy();
+            this.opponentContainer = null;
+        }
+        
+        // Clean up spectators
+        if (this.spectators && this.spectators.length > 0) {
+            this.spectators.forEach(spectator => {
+                if (spectator && spectator.destroy) {
+                    spectator.destroy();
+                }
+            });
+            this.spectators = [];
+        }
+        
+        // Clean up result texts
+        if (this.resultTexts && this.resultTexts.length > 0) {
+            this.resultTexts.forEach(text => {
+                if (text && text.destroy) {
+                    text.destroy();
+                }
+            });
+            this.resultTexts = [];
         }
         
         // Clean up debug menu
@@ -630,33 +1254,8 @@ class OutcomeScene extends Phaser.Scene {
             const enemy = enemySystem.getEnemy(this.opponentId);
             
             if (enemy) {
-                const moneyReward = enemy.calculateMoneyReward(this.finalScore);
-                
-                // Update player's money with reward
-                playerState.updateCareerProgress(this.opponentId, this.won, { moneyReward });
-                
-                // Add money reward text
-                const { width: w, height: h } = this.cameras.main;
-                const rewardsText = this.add.text(
-                    w/2, this.finalScore === this.opponentScore ? h/2 + 140 : h/2 + 70,
-                    `Money Earned: $${moneyReward}`,
-                    {
-                        fontSize: '32px',
-                        fontFamily: 'Arial',
-                        color: '#00ff00', // Green color for money
-                        stroke: '#000000',
-                        strokeThickness: 2
-                    }
-                ).setOrigin(0.5);
-                
-                // Animate rewards text
-                this.tweens.add({
-                    targets: rewardsText,
-                    scale: 1.2,
-                    duration: 200,
-                    yoyo: true,
-                    repeat: 1
-                });
+                // Only update career progress - we'll show rewards in showGameOverUI
+                playerState.updateCareerProgress(this.opponentId, this.won, null);
             }
         }
     }

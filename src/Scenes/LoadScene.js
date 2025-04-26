@@ -55,9 +55,45 @@ class LoadScene extends Phaser.Scene {
         this.load.image('lance_0', 'assets/lance_0.png');
         this.load.image('lance_1', 'assets/lance_1.png');
         this.load.image('lance_2', 'assets/lance_2.png');
+        
+        // Particle effects
+        this.load.image('particle', 'assets/particle.png');
+
+        // SFX
+        this.load.audio('crowd_cheer', 'assets/sfx/crowd_cheer.mp3');
+        this.load.audio('crowd_sheep', 'assets/sfx/group_of_sheeps.mp3');
+
+        // In game SFX
+        this.load.audio('baa', 'assets/sfx/sheep_baa.mp3');
+        this.load.audio('lance', "assets/sfx/lance_1.mp3");
+        this.load.audio('lance_hit', "assets/sfx/lance_hit.mp3");
+        
+
+        // QTE Audio
+        this.load.audio('qte_correct', 'assets/sfx/qte_button_correct_1.mp3');
+        this.load.audio('qte_mistake', 'assets/sfx/qte_button_mistake.mp3');
+
+
+        // UI SFX
+        this.load.audio('ui_click', 'assets/sfx/ui_button_sfx.mp3');
+        this.load.audio('shop_equip', 'assets/sfx/equip.mp3');
+        this.load.audio('shop_buy', 'assets/sfx/purchase.mp3');
+
+        //Music
+        this.load.audio('song_0', 'assets/music/menu.wav');
+        this.load.audio('song_1', 'assets/music/song_1.wav');
+
     }
 
     create() {
+        // Initialize global audio system
+        audioSystem = new AudioSystem(this).init();
+        
+        // Ensure music starts playing
+        if (audioSystem) {
+            audioSystem.startMusicPlaylist();
+        }
+        
         // Start the main menu scene
         this.scene.start('MainMenu');
     }

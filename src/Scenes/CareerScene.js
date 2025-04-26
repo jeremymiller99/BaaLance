@@ -45,6 +45,12 @@ class CareerScene extends Phaser.Scene {
         // Get game dimensions
         const { width: w, height: h } = this.cameras.main;
         
+        // Initialize or re-init audio system for this scene
+        if (audioSystem) {
+            audioSystem.scene = this;
+            audioSystem.init();
+        }
+        
         // Create background with parallax effect
         this.createBackground();
         
@@ -422,6 +428,10 @@ class CareerScene extends Phaser.Scene {
                 
                 // Click to show matchup preview
                 paperTexture.on('pointerdown', () => {
+                    // Play click sound
+                    if (audioSystem) {
+                        audioSystem.playClick();
+                    }
                     this.showMatchupPreview(enemy);
                 });
                 
@@ -858,18 +868,12 @@ class CareerScene extends Phaser.Scene {
             fightText.setScale(1);
         });
         
-        cancelButton.on('pointerover', () => {
-            cancelButton.setScale(1.05);
-            cancelText.setScale(1.05);
-        });
-        
-        cancelButton.on('pointerout', () => {
-            cancelButton.setScale(1);
-            cancelText.setScale(1);
-        });
-        
-        // Button click handlers
         fightButton.on('pointerdown', () => {
+            // Play click sound
+            if (audioSystem) {
+                audioSystem.playClick();
+            }
+            
             // Stop all tweens to prevent animation conflicts
             this.tweens.killAll();
             
@@ -888,7 +892,21 @@ class CareerScene extends Phaser.Scene {
             });
         });
         
+        cancelButton.on('pointerover', () => {
+            cancelButton.setScale(1.05);
+            cancelText.setScale(1.05);
+        });
+        
+        cancelButton.on('pointerout', () => {
+            cancelButton.setScale(1);
+            cancelText.setScale(1);
+        });
+        
         cancelButton.on('pointerdown', () => {
+            // Play click sound
+            if (audioSystem) {
+                audioSystem.playClick();
+            }
             this.hideMatchupPreview();
         });
     }
@@ -1278,6 +1296,11 @@ class CareerScene extends Phaser.Scene {
         console.log(`Starting career match with enemy: ${enemy.name}`);
         console.log(`Enemy skin: ${enemy.skin}, lance: ${enemy.lance}`);
         
+        // Fade out any sounds that might be playing
+        if (audioSystem) {
+            audioSystem.fadeOutAllSounds(300);
+        }
+        
         this.tweens.add({
             targets: flash,
             alpha: 0.8,
@@ -1351,35 +1374,25 @@ class CareerScene extends Phaser.Scene {
         buttonContainer.add(buttonText);
         
         // Make button interactive
-        woodenButton.setInteractive({ useHandCursor: true });
-        
-        // Hover and click effects
-        woodenButton.on('pointerover', () => {
-            woodenButton.setFillStyle(0x654321); // Darker wood on hover
-            buttonContainer.setScale(1.05);
-        });
-        
-        woodenButton.on('pointerout', () => {
-            woodenButton.setFillStyle(0x8B4513); // Back to original color
-            buttonContainer.setScale(1);
-        });
-        
-        woodenButton.on('pointerdown', () => {
-            // Pressed effect
-            buttonContainer.setScale(0.95);
-            
-            // Flash transition effect
-            const flash = this.add.rectangle(w/2, h/2, w, h, 0x000000, 0);
-            
-            this.tweens.add({
-                targets: flash,
-                alpha: 0.5,
-                duration: 300,
-                onComplete: () => {
-                    this.scene.start('MainLoop');
+        woodenButton.setInteractive({ useHandCursor: true })
+            .on('pointerover', () => {
+                woodenButton.setFillStyle(0x9c6243); // Lighter color on hover
+                buttonText.setScale(1.05);
+            })
+            .on('pointerout', () => {
+                woodenButton.setFillStyle(0x8B4513); // Reset to original color
+                buttonText.setScale(1);
+            })
+            .on('pointerdown', () => {
+                // Play click sound
+                if (audioSystem) {
+                    audioSystem.playClick();
+                    // Fade out any sounds that might be playing
+                    audioSystem.fadeOutAllSounds(300);
                 }
+                
+                this.scene.start('MainLoop');
             });
-        });
     }
     
     displayPlayerRank() {
@@ -1662,7 +1675,26 @@ class CareerScene extends Phaser.Scene {
     
     // Update or add a shutdown method to clean up the debug menu
     shutdown() {
-        // ... existing code for shutdown ...
+        // Fade out any playing sounds
+        if (audioSystem) {
+            audioSystem.fadeOutAllSounds(300);
+        }
+        
+        // Clean up tweens and input listeners
+        this.tweens.killAll();
+        this.input.off('pointerdown');
+        this.input.off('pointermove');
+        
+        // Clean up any UI elements
+        if (this.enemyTooltip) {
+            this.enemyTooltip.destroy();
+            this.enemyTooltip = null;
+        }
+        
+        if (this.matchupPreview) {
+            this.matchupPreview.destroy();
+            this.matchupPreview = null;
+        }
         
         // Clean up debug menu
         if (this.debugMenu) {

@@ -250,8 +250,10 @@ class MainLoop extends Phaser.Scene {
             // Pressed effect
             buttonContainer.setScale(0.95);
             
-            // Play click sound if available
-            // this.sound.play('click');
+            // Play click sound
+            if (audioSystem) {
+                audioSystem.playClick();
+            }
             
             // Call the callback
             if (callback) {
@@ -404,6 +406,50 @@ class MainLoop extends Phaser.Scene {
         // Create menu panel (right) - replacing the createMainMenuBoard call
         const menuPanel = this.createWoodenPanel(rightPanelX, panelY, panelWidth, PANEL.HEIGHT, "MENU");
         
+        // Make BAA panel interactive and play baa sound when clicked
+        const baaClickArea = this.add.rectangle(0, 0, panelWidth, PANEL.HEIGHT, 0xffffff, 0.001);
+        baaClickArea.setInteractive({ useHandCursor: true });
+        baaClickArea.on('pointerdown', () => {
+            if (audioSystem) {
+                audioSystem.playSfx('baa');
+            }
+            
+            // Add visual feedback
+            this.createClickFeedback(championPanel);
+            
+            // Make the sheep sprite bounce
+            this.tweens.add({
+                targets: playerSprite,
+                y: -20, 
+                duration: 150, 
+                yoyo: true, 
+                ease: 'Sine.easeOut'
+            });
+        });
+        championPanel.add(baaClickArea);
+        
+        // Make LANCE panel interactive and play lance sound when clicked
+        const lanceClickArea = this.add.rectangle(0, 0, panelWidth, PANEL.HEIGHT, 0xffffff, 0.001);
+        lanceClickArea.setInteractive({ useHandCursor: true });
+        lanceClickArea.on('pointerdown', () => {
+            if (audioSystem) {
+                audioSystem.playSfx('lance');
+            }
+            
+            // Add visual feedback
+            this.createClickFeedback(lancePanel);
+            
+            // Make the lance rotate slightly
+            this.tweens.add({
+                targets: lanceSprite,
+                rotation: -Math.PI/2 - 0.2,
+                duration: 100,
+                yoyo: true,
+                ease: 'Sine.easeOut'
+            });
+        });
+        lancePanel.add(lanceClickArea);
+        
         // Create player container inside the champion panel
         const playerContainer = this.add.container(0, 15);
         championPanel.add(playerContainer);
@@ -502,9 +548,9 @@ class MainLoop extends Phaser.Scene {
         // Create menu buttons
         const buttons = [
             { text: 'Quick Match', callback: () => this.startQuickMatch() },
-            { text: 'Career Mode', callback: () => this.startCareerMode() },
-            { text: 'Tournament', callback: () => this.startTournament() },
-            { text: 'Shop', callback: () => this.openShop() }
+            { text: 'Bounty', callback: () => this.startCareerMode() },
+            { text: 'Shop', callback: () => this.openShop() },
+            { text: 'Main Menu', callback: () => this.returnToMainMenu() }
         ];
         
         // Store menu button references for cleanup
@@ -547,301 +593,152 @@ class MainLoop extends Phaser.Scene {
     }
 
     startQuickMatch() {
-        // Get player data
-        const playerData = playerState.getState();
-        
-        // Clear any existing dialog
-        if (this.quickMatchDialog) {
-            this.quickMatchDialog.destroy();
-            this.quickMatchDialog = null;
+        // Play click sound
+        if (audioSystem) {
+            audioSystem.playClick();
         }
         
+        // Create a submenu for opponent selection
+        this.showQuickMatchMenu();
+    }
+
+    showQuickMatchMenu() {
         const { width: w, height: h } = this.cameras.main;
-        const { COLORS, FONTS } = this.UI;
+        const { COLORS, FONTS, PANEL } = this.UI;
         
-        // Create medieval style dialog container
-        this.quickMatchDialog = this.add.container(w/2, h/2);
+        // Create an overlay to darken the background
+        const overlay = this.add.rectangle(w/2, h/2, w, h, 0x000000, 0.7);
+        overlay.setDepth(100);
         
-        // Add darkened overlay with medieval texture
-        const overlay = this.add.rectangle(0, 0, w, h, 0x2a1a0a, 0.7);
-        overlay.setOrigin(0.5);
-        overlay.setInteractive(); // Make overlay capture input events to prevent clicking through
-        this.quickMatchDialog.add(overlay);
+        // Create a panel for the quick match menu
+        const menuPanel = this.add.container(w/2, h/2);
+        menuPanel.setDepth(101);
         
-        // Create wooden panel for the dialog
-        const dialogWidth = 450;
-        const dialogHeight = 500;
+        // Create wooden panel background
+        const panel = this.createWoodenPanel(0, 0, 500, 400, "SELECT OPPONENT");
+        menuPanel.add(panel);
         
-        // Create the wooden background
-        const woodPanel = this.add.rectangle(0, 0, dialogWidth, dialogHeight, COLORS.WOOD_SECONDARY, 1);
-        woodPanel.setStrokeStyle(8, COLORS.WOOD_BORDER);
-        this.quickMatchDialog.add(woodPanel);
+        // Initialize enemy system to get league data
+        const enemySystem = new EnemySystem(this);
         
-        // Add wood grain texture
-        const grainGraphics = this.add.graphics();
-        grainGraphics.lineStyle(1, COLORS.WOOD_GRAIN, 0.4);
-        
-        // Horizontal wood grain lines
-        for (let i = -dialogHeight/2 + 20; i < dialogHeight/2; i += 20) {
-            // Make lines wavy
-            grainGraphics.beginPath();
-            grainGraphics.moveTo(-dialogWidth/2 + 10, i);
-            
-            for (let x = -dialogWidth/2 + 30; x < dialogWidth/2; x += 20) {
-                const yOffset = Phaser.Math.Between(-3, 3);
-                grainGraphics.lineTo(x, i + yOffset);
-            }
-            
-            grainGraphics.strokePath();
-        }
-        this.quickMatchDialog.add(grainGraphics);
-        
-        // Add decorative nails/metal fixtures in the corners
-        const cornerOffset = 30;
-        const cornerPositions = [
-            {x: -dialogWidth/2 + cornerOffset, y: -dialogHeight/2 + cornerOffset},
-            {x: dialogWidth/2 - cornerOffset, y: -dialogHeight/2 + cornerOffset},
-            {x: -dialogWidth/2 + cornerOffset, y: dialogHeight/2 - cornerOffset},
-            {x: dialogWidth/2 - cornerOffset, y: dialogHeight/2 - cornerOffset}
-        ];
-        
-        cornerPositions.forEach(pos => {
-            // Metal plate
-            const plate = this.add.rectangle(pos.x, pos.y, 30, 30, COLORS.METAL, 1);
-            plate.setStrokeStyle(1, COLORS.METAL_DARK);
-            this.quickMatchDialog.add(plate);
-            
-            // Center nail/rivet
-            const nail = this.add.circle(pos.x, pos.y, 6, 0x999999, 1);
-            nail.setStrokeStyle(1, 0x777777);
-            this.quickMatchDialog.add(nail);
-            
-            // Add shadow to nail
-            const nailShadow = this.add.circle(pos.x + 1, pos.y + 1, 6, 0x000000, 0.3);
-            this.quickMatchDialog.add(nailShadow);
-        });
-        
-        // Create title banner
-        const titleWidth = dialogWidth * 0.8;
-        const titleHeight = 60;
-        const titleBg = this.add.rectangle(0, -dialogHeight/2 + 40, titleWidth, titleHeight, COLORS.WOOD_PRIMARY, 1);
-        titleBg.setStrokeStyle(4, COLORS.WOOD_BORDER);
-        this.quickMatchDialog.add(titleBg);
-        
-        // Add wood grain to title banner
-        const titleGrainGraphics = this.add.graphics();
-        titleGrainGraphics.lineStyle(1, COLORS.WOOD_GRAIN, 0.3);
-        
-        for (let i = -titleHeight/2 + 5; i < titleHeight/2; i += 8) {
-            titleGrainGraphics.beginPath();
-            titleGrainGraphics.moveTo(-titleWidth/2 + 5, -dialogHeight/2 + 40 + i);
-            
-            for (let x = -titleWidth/2 + 10; x < titleWidth/2; x += 15) {
-                const yOffset = Phaser.Math.Between(-1, 1);
-                titleGrainGraphics.lineTo(x, -dialogHeight/2 + 40 + i + yOffset);
-            }
-            
-            titleGrainGraphics.strokePath();
-        }
-        this.quickMatchDialog.add(titleGrainGraphics);
-        
-        // Add title text
-        const titleText = this.add.text(0, -dialogHeight/2 + 40, 'Quick Match', {
-            fontSize: '28px',
-            fontFamily: FONTS.FAMILY,
-            color: COLORS.TEXT,
-            fontStyle: 'bold'
-        }).setOrigin(0.5);
-        titleText.setShadow(2, 2, '#000000', 3);
-        this.quickMatchDialog.add(titleText);
-        
-        // Create league buttons with medieval styling
-        const leagues = [
-            { id: 'rookie', name: 'Rookie League', color: '#66ff66', description: 'For new jousters' },
-            { id: 'amateur', name: 'Amateur League', color: '#ffaa00', description: 'Experienced competitors' },
-            { id: 'pro', name: 'Pro League', color: '#ff6666', description: 'Elite champions' }
-        ];
-        
-        // Check which leagues are unlocked
+        // Get available leagues
+        const leagues = enemySystem.getLeagues();
         const unlockedLeagues = playerState.getUnlockedLeagues();
         
-        leagues.forEach((league, index) => {
-            const isUnlocked = unlockedLeagues.includes(league.id);
-            const yPos = -80 + (index * 120);
+        // Create league selection buttons
+        let buttonY = -120;
+        const buttonSpacing = 90;
+        
+        Object.keys(leagues).forEach(leagueId => {
+            const league = leagues[leagueId];
+            const isUnlocked = unlockedLeagues.includes(leagueId);
             
-            // Create medieval scroll/banner for each league
-            const leaguePanel = this.add.container(0, yPos);
-            this.quickMatchDialog.add(leaguePanel);
-            
-            // League banner
-            let bannerColor = isUnlocked ? 
-                (league.id === 'rookie' ? 0x006600 : 
-                 league.id === 'amateur' ? 0x885500 : 0x660000) : 
-                0x333333;
-            
-            const leagueBanner = this.add.rectangle(0, 0, 350, 80, bannerColor, 0.9);
-            leagueBanner.setStrokeStyle(3, isUnlocked ? 0xd4af37 : 0x555555);
-            leaguePanel.add(leagueBanner);
-            
-            // Add wood grain texture if unlocked
-            if (isUnlocked) {
-                const leagueGrain = this.add.graphics();
-                leagueGrain.lineStyle(1, 0x000000, 0.2);
-                
-                for (let i = -40 + 5; i < 40; i += 10) {
-                    leagueGrain.beginPath();
-                    leagueGrain.moveTo(-175 + 5, i);
-                    
-                    for (let x = -175 + 10; x < 175; x += 15) {
-                        const yOffset = Phaser.Math.Between(-1, 1);
-                        leagueGrain.lineTo(x, i + yOffset);
+            // Create league button
+            const buttonWidth = 350;
+            const buttonHeight = 70;
+            const buttonContainer = this.createWoodenButton(
+                panel,
+                0,
+                buttonY,
+                league.name,
+                buttonWidth,
+                buttonHeight,
+                () => {
+                    if (isUnlocked) {
+                        this.startLanceGameWithLeague(leagueId);
+                        
+                        // Clean up menu
+                        menuPanel.destroy();
+                        overlay.destroy();
+                    } else {
+                        // Show locked message
+                        const errorText = this.add.text(0, 150, "This league is locked! Win more matches to unlock.", {
+                            fontSize: '20px',
+                            fontFamily: FONTS.FAMILY,
+                            color: '#ff0000',
+                            stroke: '#000000',
+                            strokeThickness: 2
+                        }).setOrigin(0.5);
+                        panel.add(errorText);
+                        
+                        // Remove error message after 2 seconds
+                        this.time.delayedCall(2000, () => {
+                            errorText.destroy();
+                        });
                     }
-                    
-                    leagueGrain.strokePath();
                 }
-                leaguePanel.add(leagueGrain);
-            }
+            );
             
-            // Add league name with medieval styling
-            const leagueText = this.add.text(0, -15, league.name, {
-                fontSize: '26px',
-                fontFamily: FONTS.FAMILY,
-                color: isUnlocked ? COLORS.TEXT : '#888888',
-                fontStyle: 'bold'
+            // Add icon based on unlock status
+            const icon = isUnlocked ? "🏆" : "🔒";
+            const iconText = this.add.text(-buttonWidth/2 + 30, 0, icon, {
+                fontSize: '24px',
+                fontFamily: FONTS.FAMILY
             }).setOrigin(0.5);
+            buttonContainer.add(iconText);
             
-            if (isUnlocked) {
-                leagueText.setShadow(2, 2, '#000000', 3);
-            }
+            // Add description
+            const descText = this.add.text(0, buttonHeight/2 + 10, 
+                isUnlocked ? `Compete against ${league.name.toLowerCase()} opponents` : "Win more matches to unlock",
+                {
+                    fontSize: '14px',
+                    fontFamily: FONTS.FAMILY,
+                    color: isUnlocked ? COLORS.TEXT_SECONDARY : '#ff6666',
+                }
+            ).setOrigin(0.5);
+            buttonContainer.add(descText);
             
-            leaguePanel.add(leagueText);
-            
-            // Add league description
-            const descText = this.add.text(0, 15, league.description, {
-                fontSize: '18px',
-                fontFamily: FONTS.FAMILY,
-                color: isUnlocked ? COLORS.TEXT_SECONDARY : '#666666'
-            }).setOrigin(0.5);
-            leaguePanel.add(descText);
-            
-            // Add lock icon for locked leagues
+            // Dim the button if locked
             if (!isUnlocked) {
-                const lockContainer = this.add.container(120, 0);
-                
-                // Metal plate behind lock
-                const lockPlate = this.add.circle(0, 0, 22, 0x696969, 1);
-                lockPlate.setStrokeStyle(1, 0x444444);
-                lockContainer.add(lockPlate);
-                
-                // Lock symbol
-                const lockText = this.add.text(0, 0, '🔒', {
-                    fontSize: '28px',
-                    fontFamily: FONTS.FAMILY
-                }).setOrigin(0.5);
-                lockContainer.add(lockText);
-                
-                leaguePanel.add(lockContainer);
+                buttonContainer.setAlpha(0.7);
             }
             
-            // Make button interactive if unlocked
-            if (isUnlocked) {
-                leagueBanner.setInteractive({ useHandCursor: true });
-                
-                // Add hover effects
-                leagueBanner.on('pointerover', () => {
-                    leagueBanner.setScale(1.05);
-                    leagueText.setScale(1.05);
-                    descText.setScale(1.05);
-                });
-                
-                leagueBanner.on('pointerout', () => {
-                    leagueBanner.setScale(1);
-                    leagueText.setScale(1);
-                    descText.setScale(1);
-                });
-                
-                // Add click handler
-                leagueBanner.on('pointerdown', () => {
-                    const opponentScore = Phaser.Math.Between(5, 15);
-                    
-                    // Start the lance game with selected league
-                    this.scene.start('LanceGame', {
-                        opponentScore: opponentScore,
-                        matchType: 'quick',
-                        opponentLeague: league.id,
-                        currentSkin: playerData.currentSkin
-                    });
-                    
-                    // Destroy dialog
-                    this.quickMatchDialog.destroy();
-                    this.quickMatchDialog = null;
-                });
-            }
+            buttonY += buttonSpacing;
         });
         
-        // Add wooden cancel button at bottom
-        const cancelButtonWidth = 200;
-        const cancelButtonHeight = 50;
-        const cancelY = dialogHeight/2 - 40;
-        
-        // Wooden cancel button
-        const cancelButton = this.add.rectangle(0, cancelY, cancelButtonWidth, cancelButtonHeight, COLORS.WOOD_PRIMARY, 1);
-        cancelButton.setStrokeStyle(4, COLORS.WOOD_BORDER);
-        this.quickMatchDialog.add(cancelButton);
-        
-        // Add wood grain to cancel button
-        const cancelGrain = this.add.graphics();
-        cancelGrain.lineStyle(1, COLORS.WOOD_GRAIN, 0.3);
-        
-        for (let i = -cancelButtonHeight/2 + 5; i < cancelButtonHeight/2; i += 8) {
-            cancelGrain.beginPath();
-            cancelGrain.moveTo(-cancelButtonWidth/2 + 5, cancelY + i);
-            
-            for (let x = -cancelButtonWidth/2 + 10; x < cancelButtonWidth/2; x += 15) {
-                const yOffset = Phaser.Math.Between(-1, 1);
-                cancelGrain.lineTo(x, cancelY + i + yOffset);
+        // Add back button
+        const backButton = this.createWoodenButton(
+            panel,
+            0,
+            buttonY,
+            "BACK",
+            200,
+            50,
+            () => {
+                // Play click sound
+                if (audioSystem) {
+                    audioSystem.playClick();
+                }
+                
+                // Clean up menu
+                menuPanel.destroy();
+                overlay.destroy();
             }
-            
-            cancelGrain.strokePath();
+        );
+    }
+    
+    startLanceGameWithLeague(leagueId) {
+        // Fade out any current sounds
+        if (audioSystem) {
+            audioSystem.fadeOutAllSounds(300);
         }
-        this.quickMatchDialog.add(cancelGrain);
         
-        // Add cancel text
-        const cancelText = this.add.text(0, cancelY, 'RETURN', {
-            fontSize: '24px',
-            fontFamily: FONTS.FAMILY,
-            color: COLORS.TEXT,
-            fontStyle: 'bold'
-        }).setOrigin(0.5);
-        cancelText.setShadow(2, 2, '#000000', 3);
-        this.quickMatchDialog.add(cancelText);
-        
-        // Make cancel button interactive
-        cancelButton.setInteractive({ useHandCursor: true });
-        
-        // Add hover effects
-        cancelButton.on('pointerover', () => {
-            cancelButton.setFillStyle(COLORS.BUTTON_HOVER);
-            cancelButton.setScale(1.05);
-            cancelText.setScale(1.05);
-        });
-        
-        cancelButton.on('pointerout', () => {
-            cancelButton.setFillStyle(COLORS.WOOD_PRIMARY);
-            cancelButton.setScale(1);
-            cancelText.setScale(1);
-        });
-        
-        // Add click handler
-        cancelButton.on('pointerdown', () => {
-            this.quickMatchDialog.destroy();
-            this.quickMatchDialog = null;
+        // Set mode and start lance game
+        this.scene.start('LanceGame', {
+            matchType: 'quick',
+            currentSkin: playerState.getState().currentSkin,
+            opponentLeague: leagueId
         });
     }
 
-    startTournament() {
-        // TODO: Implement tournament mode
-        console.log('Tournament mode coming soon!');
+    returnToMainMenu() {
+        // Play click sound
+        if (audioSystem) {
+            audioSystem.playClick();
+        }
+        
+        // Return to main menu scene
+        this.scene.start('MainMenu');
     }
 
     openShop() {
@@ -850,6 +747,16 @@ class MainLoop extends Phaser.Scene {
 
     startCareerMode() {
         this.scene.start('CareerScene');
+    }
+    
+    openOptions() {
+        // Play click sound
+        if (audioSystem) {
+            audioSystem.playClick();
+        }
+        
+        console.log('Options menu coming soon!');
+        // TODO: Implement options menu in future update
     }
 
     // This method is now called from OutcomeScene through the global playerState
@@ -957,7 +864,7 @@ class MainLoop extends Phaser.Scene {
         // Menu items with icons and descriptions
         const menuItems = [
             { text: "QUICK MATCH", icon: "⚔️", desc: "Battle against a random opponent", action: () => this.startQuickMatch() },
-            { text: "CAREER MODE", icon: "👑", desc: "Start your jousting career", action: () => this.startCareerMode() },
+            { text: "BOUNTY", icon: "👑", desc: "Start your jousting career", action: () => this.startCareerMode() },
             { text: "SHOP", icon: "🛡️", desc: "Buy and equip gear", action: () => this.openShop() },
             { text: "OPTIONS", icon: "⚙️", desc: "Adjust game settings", action: () => this.openOptions() }
         ];
@@ -1013,5 +920,55 @@ class MainLoop extends Phaser.Scene {
             color: COLORS.TEXT_SECONDARY
         }).setOrigin(0.5);
         this.menuPanel.add(versionText);
+    }
+
+    createClickFeedback(panel) {
+        // Create a flash effect that fades out
+        const flash = this.add.rectangle(0, 0, panel.width, panel.height, 0xffffff, 0.5);
+        panel.add(flash);
+        
+        // Animate the flash to fade out
+        this.tweens.add({
+            targets: flash,
+            alpha: 0,
+            duration: 300,
+            ease: 'Power2',
+            onComplete: () => {
+                flash.destroy();
+            }
+        });
+        
+        // Create a simple particle effect with circles
+        const particleCount = 10;
+        const particleObjects = [];
+        
+        for (let i = 0; i < particleCount; i++) {
+            // Random position within panel
+            const x = Phaser.Math.Between(-panel.width/2 + 20, panel.width/2 - 20);
+            const y = Phaser.Math.Between(-panel.height/2 + 20, panel.height/2 - 20);
+            
+            // Create circle with random color
+            const colors = [0xffffff, 0xffff00, 0xff8800];
+            const color = Phaser.Utils.Array.GetRandom(colors);
+            const size = Phaser.Math.Between(3, 8);
+            
+            const particle = this.add.circle(x, y, size, color, 0.8);
+            panel.add(particle);
+            particleObjects.push(particle);
+            
+            // Animate each particle
+            this.tweens.add({
+                targets: particle,
+                x: x + Phaser.Math.Between(-40, 40),
+                y: y + Phaser.Math.Between(-40, 40),
+                alpha: 0,
+                scale: 0.2,
+                duration: Phaser.Math.Between(300, 600),
+                ease: 'Power2',
+                onComplete: () => {
+                    particle.destroy();
+                }
+            });
+        }
     }
 } 

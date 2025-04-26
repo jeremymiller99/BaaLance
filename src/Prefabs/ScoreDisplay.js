@@ -2,66 +2,52 @@ class ScoreDisplay {
     constructor(scene) {
         this.scene = scene;
         this.scoreText = null;
-        this.lastScore = 0;
+        this.scoreValue = 0;
+        this.displayValue = 0;
+        this.lastUpdateTime = 0;
+        
+        // Animation parameters
+        this.animationSpeed = 10; // Points per second for score animation
     }
 
     create() {
-        // Create score text style
-        this.textStyle = {
+        // Get game dimensions
+        const { width: w, height: h } = this.scene.cameras.main;
+        
+        // Create score text
+        const scoreStyle = {
             fontSize: '32px',
             fontFamily: 'Arial',
             color: '#ffffff',
             stroke: '#000000',
             strokeThickness: 4
         };
-
-        // Create score display
-        this.scoreText = this.scene.add.text(20, 20, 'Score: 0', this.textStyle);
+        
+        this.scoreText = this.scene.add.text(w/2, 50, 'Score: 0', scoreStyle).setOrigin(0.5);
     }
 
-    update(score) {
-        // Animate score change
-        if (score !== this.lastScore) {
-            this.animateScoreChange(score);
-            this.lastScore = score;
+    update(score, delta) {
+        // Store the new score value
+        this.scoreValue = score;
+        
+        // If this is the first update or delta is provided, use smooth animation
+        if (delta && this.displayValue !== this.scoreValue) {
+            // Calculate how much to increment based on animation speed and delta
+            const deltaSeconds = delta / 1000;
+            const increment = this.animationSpeed * deltaSeconds;
+            
+            if (this.displayValue < this.scoreValue) {
+                this.displayValue = Math.min(this.displayValue + increment, this.scoreValue);
+            } else if (this.displayValue > this.scoreValue) {
+                this.displayValue = Math.max(this.displayValue - increment, this.scoreValue);
+            }
+            
+            this.scoreText.setText(`Score: ${Math.round(this.displayValue)}`);
+        } else {
+            // Immediate update if no delta is provided
+            this.displayValue = this.scoreValue;
+            this.scoreText.setText(`Score: ${this.scoreValue}`);
         }
-    }
-
-    animateScoreChange(newValue) {
-        // Create a temporary text for the animation
-        const diff = newValue - this.lastScore;
-        const sign = diff > 0 ? '+' : '';
-        const tempText = this.scene.add.text(
-            this.scoreText.x,
-            this.scoreText.y,
-            `${sign}${diff}`,
-            {
-                ...this.textStyle,
-                color: diff > 0 ? '#00ff00' : '#ff0000'
-            }
-        );
-
-        // Animate the temporary text
-        this.scene.tweens.add({
-            targets: tempText,
-            y: tempText.y - 30,
-            alpha: 0,
-            duration: 1000,
-            onComplete: () => {
-                tempText.destroy();
-            }
-        });
-
-        // Update the main text
-        this.scoreText.setText(`Score: ${newValue}`);
-
-        // Add a quick scale animation to the main text
-        this.scene.tweens.add({
-            targets: this.scoreText,
-            scale: 1.2,
-            duration: 200,
-            yoyo: true
-        });
     }
 
     destroy() {

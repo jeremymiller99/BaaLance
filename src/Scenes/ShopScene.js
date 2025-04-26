@@ -48,6 +48,12 @@ class ShopScene extends Phaser.Scene {
         // Get game dimensions
         const { width, height } = this.cameras.main;
         
+        // Initialize or re-init audio system for this scene
+        if (audioSystem) {
+            audioSystem.scene = this;
+            audioSystem.init();
+        }
+        
         // Initialize systems
         this.skinSystem = new SkinSystem(this);
         this.weaponSystem = new WeaponSystem(this);
@@ -290,7 +296,13 @@ class ShopScene extends Phaser.Scene {
                     bg.fillColor = COLORS.BUTTON_BG;
                     text.setScale(1);
                 })
-                .on('pointerdown', () => this.showCategory(category.id));
+                .on('pointerdown', () => {
+                    // Play click sound
+                    if (audioSystem) {
+                        audioSystem.playClick();
+                    }
+                    this.showCategory(category.id);
+                });
             
             button.add([bg, grainGraphics, text]);
             this.categoryButtons.push(button);
@@ -344,7 +356,15 @@ class ShopScene extends Phaser.Scene {
                 bg.fillColor = COLORS.WOOD_PRIMARY;
                 text.setScale(1);
             })
-            .on('pointerdown', () => this.scene.start('MainLoop'));
+            .on('pointerdown', () => {
+                // Play click sound
+                if (audioSystem) {
+                    audioSystem.playClick();
+                    // Fade out all sounds
+                    audioSystem.fadeOutAllSounds(300);
+                }
+                this.scene.start('MainLoop');
+            });
         
         button.add([bg, grainGraphics, text]);
         this.mainPanel.add(button);
@@ -579,6 +599,11 @@ class ShopScene extends Phaser.Scene {
                         actionBtnText.setScale(1);
                     })
                     .on('pointerdown', () => {
+                        // Play click sound
+                        if (audioSystem) {
+                            audioSystem.playClick();
+                        }
+                        
                         if (!isUnlocked) {
                             this.purchaseItem(item);
                         } else {
@@ -595,7 +620,13 @@ class ShopScene extends Phaser.Scene {
                 .on('pointerout', () => {
                     if (isUnlocked) bg.fillColor = COLORS.WOOD_SECONDARY;
                 })
-                .on('pointerdown', () => this.previewItem(item));
+                .on('pointerdown', () => {
+                    // Play click sound
+                    if (audioSystem) {
+                        audioSystem.playClick();
+                    }
+                    this.previewItem(item);
+                });
             
             gridContainer.add(itemContainer);
         });
@@ -769,17 +800,22 @@ class ShopScene extends Phaser.Scene {
                 playerState.setCurrentLance(item.id);
             }
             
-            // Play sound if available
-            if (this.sound.get('purchase')) {
-                this.sound.play('purchase', { volume: 0.7 });
+            // Play purchase sound
+            if (audioSystem) {
+                audioSystem.playSfx('buy');
             }
             
             // Show success message
             this.showMessage(`You've acquired: ${item.name}!`, true);
             
-            // Refresh display
+            // Refresh the display
             this.showCategory(this.selectedCategory);
         } else {
+            // Play error click for insufficient funds
+            if (audioSystem) {
+                audioSystem.playSfx('qteMistake');
+            }
+            
             // Show insufficient funds message
             this.showMessage("You don't have enough coins for this purchase.", false);
         }
@@ -799,16 +835,19 @@ class ShopScene extends Phaser.Scene {
             playerState.setCurrentLance(item.id);
         }
         
+        // Play equip sound
+        if (audioSystem) {
+            audioSystem.playSfx('equip');
+        }
+        
         // For debugging
         console.log(`Player state after selection:`, playerState.getState());
         
-        // Play sound if available
-        if (this.sound.get('select')) {
-            this.sound.play('select', { volume: 0.5 });
-        }
-        
-        // Refresh display
+        // Refresh the display to update button states
         this.showCategory(this.selectedCategory);
+        
+        // Show equipped message
+        this.showMessage(`${item.name} equipped!`, true);
     }
     
     showMessage(message, isSuccess) {
