@@ -309,7 +309,7 @@ class MainLoop extends Phaser.Scene {
         // Add stats with medieval styling
         stats.forEach((stat, index) => {
             const xPos = -270 + (spacing * index);
-            const yPos = 15;
+            const yPos = 0; // Changed from 15 to 0 to move text up
             
             // Create label
             const labelText = this.add.text(xPos, yPos - 25, stat.label, {
@@ -467,71 +467,10 @@ class MainLoop extends Phaser.Scene {
         const lanceType = playerData.equipment.currentLance;
         
         // Add a lance sprite directly - no background decoration
-        const lanceSprite = this.add.sprite(0, -20, lanceType);
+        const lanceSprite = this.add.sprite(0, 0, lanceType);
         lanceSprite.setScale(0.45);
         lanceSprite.setRotation(-Math.PI/2); // Rotate 90 degrees to make it vertical
         lancePanel.add(lanceSprite);
-        
-        // Add lance name
-        const lanceNames = {
-            'lance_0': 'Novice Lance',
-            'lance_1': 'Knight Lance',
-            'lance_2': 'Royal Lance'
-        };
-        const lanceName = lanceNames[lanceType] || lanceType;
-        
-        // Add lance info in lance panel
-        const lanceTitle = this.add.text(0, 100, lanceName, {
-            fontSize: '20px',
-            fontFamily: this.UI.FONTS.FAMILY,
-            color: this.UI.COLORS.TEXT,
-            fontStyle: 'bold'
-        }).setOrigin(0.5);
-        lanceTitle.setShadow(2, 2, '#000000', 3);
-        lancePanel.add(lanceTitle);
-        
-        // Add lance stats
-        const lanceStats = {
-            'lance_0': { power: 2, weight: 1, range: 3 },
-            'lance_1': { power: 3, weight: 2, range: 4 },
-            'lance_2': { power: 5, weight: 3, range: 5 }
-        };
-        
-        const currentLanceStats = lanceStats[lanceType] || { power: 1, weight: 1, range: 1 };
-        
-        // Add stat labels and values
-        const statY = 135;
-        const statSpacing = 30;
-        const stats = [
-            { label: "POWER", value: currentLanceStats.power },
-            { label: "WEIGHT", value: currentLanceStats.weight },
-            { label: "RANGE", value: currentLanceStats.range }
-        ];
-        
-        stats.forEach((stat, index) => {
-            const yPos = statY + (index * statSpacing);
-            
-            // Label
-            const statLabel = this.add.text(-50, yPos, stat.label + ":", {
-                fontSize: '14px',
-                fontFamily: this.UI.FONTS.FAMILY,
-                color: this.UI.COLORS.TEXT_SECONDARY,
-            }).setOrigin(0, 0.5);
-            lancePanel.add(statLabel);
-            
-            // Value with stars
-            let stars = "";
-            for (let i = 0; i < stat.value; i++) {
-                stars += "★";
-            }
-            
-            const statValue = this.add.text(10, yPos, stars, {
-                fontSize: '14px',
-                fontFamily: this.UI.FONTS.FAMILY,
-                color: this.UI.COLORS.TEXT,
-            }).setOrigin(0, 0.5);
-            lancePanel.add(statValue);
-        });
         
         // Add menu buttons to the menu panel
         this.createMenuButtons(menuPanel);

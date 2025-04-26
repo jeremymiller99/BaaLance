@@ -200,28 +200,79 @@ class ShopScene extends Phaser.Scene {
         title.setShadow(2, 2, '#000000', 3);
         this.mainPanel.add(title);
         
-        // Money display with coin icon
+        // Money display - wooden banner with coin pouch style
+        const moneyBannerWidth = 160;
+        const moneyBannerHeight = 40;
+        const moneyBannerX = PANEL.WIDTH/2 - moneyBannerWidth/2 - 10;
+        const moneyBannerY = -PANEL.HEIGHT/2 + 30;
+        
+        // Wooden banner background
+        const moneyBanner = this.add.rectangle(
+            moneyBannerX, 
+            moneyBannerY, 
+            moneyBannerWidth, 
+            moneyBannerHeight, 
+            COLORS.WOOD_PRIMARY, 
+            1
+        ).setStrokeStyle(3, COLORS.WOOD_BORDER);
+        
+        // Add wood grain to money banner
+        const moneyGrain = this.add.graphics();
+        moneyGrain.lineStyle(1, COLORS.WOOD_GRAIN, 0.3);
+        
+        for (let i = -moneyBannerHeight/2 + 5; i < moneyBannerHeight/2; i += 8) {
+            moneyGrain.beginPath();
+            moneyGrain.moveTo(moneyBannerX - moneyBannerWidth/2 + 5, moneyBannerY + i);
+            
+            for (let x = -moneyBannerWidth/2 + 10; x < moneyBannerWidth/2; x += 15) {
+                const yOffset = Phaser.Math.Between(-1, 1);
+                moneyGrain.lineTo(moneyBannerX + x, moneyBannerY + i + yOffset);
+            }
+            
+            moneyGrain.strokePath();
+        }
+        
+        // Add decorative nails at corners
+        const nailPositions = [
+            {x: moneyBannerX - moneyBannerWidth/2 + 8, y: moneyBannerY - moneyBannerHeight/2 + 8},
+            {x: moneyBannerX + moneyBannerWidth/2 - 8, y: moneyBannerY - moneyBannerHeight/2 + 8},
+            {x: moneyBannerX - moneyBannerWidth/2 + 8, y: moneyBannerY + moneyBannerHeight/2 - 8},
+            {x: moneyBannerX + moneyBannerWidth/2 - 8, y: moneyBannerY + moneyBannerHeight/2 - 8}
+        ];
+        
+        nailPositions.forEach(pos => {
+            const nail = this.add.circle(pos.x, pos.y, 3, COLORS.METAL, 1);
+            nail.setStrokeStyle(1, COLORS.METAL_DARK);
+            this.mainPanel.add(nail);
+        });
+        
+        // Coin icon/pouch
+        const coinIconX = moneyBannerX - moneyBannerWidth/2 + 25;
+        const coinIcon = this.add.circle(coinIconX, moneyBannerY, 15, COLORS.GOLD, 1);
+        coinIcon.setStrokeStyle(2, 0x000000, 1);
+        
+        // Add a small pouch-like detail to the coin
+        const coinDetail = this.add.graphics();
+        coinDetail.lineStyle(1.5, 0x000000, 0.8);
+        coinDetail.beginPath();
+        coinDetail.arc(coinIconX, moneyBannerY, 8, Math.PI * 0.2, Math.PI * 0.8);
+        coinDetail.strokePath();
+        
+        // Money text
         this.moneyText = this.add.text(
-            PANEL.WIDTH/2 - 30, 
-            -PANEL.HEIGHT/2 + 30, 
-            `${this.playerMoney} coins`, 
+            moneyBannerX - moneyBannerWidth/2 + 45, 
+            moneyBannerY, 
+            `$${this.playerMoney}`, 
             {
-                fontSize: '24px',
+                fontSize: '20px',
                 fontFamily: FONTS.FAMILY,
-                color: COLORS.GOLD,
+                color: COLORS.TEXT,
                 fontStyle: 'bold'
             }
-        ).setOrigin(1, 0.5);
-        this.moneyText.setShadow(2, 2, '#000000', 2);
+        ).setOrigin(0, 0.5);
+        this.moneyText.setShadow(1, 1, '#000000', 2);
         
-        // Add coin icon
-        const coinIcon = this.add.graphics();
-        coinIcon.fillStyle(COLORS.GOLD, 1);
-        coinIcon.fillCircle(PANEL.WIDTH/2 - 10, -PANEL.HEIGHT/2 + 30, 12);
-        coinIcon.lineStyle(2, 0x000000, 1);
-        coinIcon.strokeCircle(PANEL.WIDTH/2 - 10, -PANEL.HEIGHT/2 + 30, 12);
-        
-        this.mainPanel.add([this.moneyText, coinIcon]);
+        this.mainPanel.add([moneyBanner, moneyGrain, coinIcon, coinDetail, this.moneyText]);
         
         // Category buttons
         this.createCategoryButtons();
@@ -386,7 +437,8 @@ class ShopScene extends Phaser.Scene {
         // Clear item grid
         this.itemsContainer.removeAll(true);
         
-        // Clear preview
+        // Clear preview container - don't automatically preview the first item
+        // This prevents any accidental playing of the lance sound
         this.previewContainer.removeAll(true);
         
         // Update item grid
@@ -484,23 +536,33 @@ class ShopScene extends Phaser.Scene {
             const frame = this.selectedCategory === 'skins' ? (item.defaultFrame || 0) : undefined;
             
             try {
-                itemImage = this.add.sprite(0, -30, key, frame).setScale(0.25);
-                
-                // Apply rotation only to lances (weapons), not character skins
-                if (this.selectedCategory === 'weapons') {
-                    itemImage.setRotation(Math.PI / 4); // 45 degrees in radians
-                    itemImage.setScale(0.2); // Make lances slightly smaller
+                // Check if texture exists before creating sprite
+                if (this.textures.exists(key)) {
+                    itemImage = this.add.sprite(0, -30, key, frame).setScale(0.25);
+                    
+                    // Apply rotation only to lances (weapons), not character skins
+                    if (this.selectedCategory === 'weapons') {
+                        itemImage.setRotation(Math.PI / 4); // 45 degrees in radians
+                        itemImage.setScale(0.2); // Make lances slightly smaller
+                    }
+                    
+                    if (!isUnlocked) itemImage.setTint(0x777777);
+                    itemContainer.add(itemImage);
+                } else {
+                    console.error(`Texture not found: ${key}`);
+                    itemContainer.add(this.add.rectangle(0, -30, 50, 50, 0xAA0000));
                 }
-                
-                if (!isUnlocked) itemImage.setTint(0x777777);
-                itemContainer.add(itemImage);
             } catch (error) {
                 console.error(`Error creating image: ${key}`, error);
                 itemContainer.add(this.add.rectangle(0, -30, 50, 50, 0xAA0000));
             }
             
             // Item name
-            const nameText = this.add.text(0, 25, item.name || 'Unknown', {
+            const displayName = this.selectedCategory === 'skins' ? 
+                (item.name || 'Unknown') : 
+                'Weapon Upgrade'; // Use a generic name for weapons to avoid "lance" text
+                
+            const nameText = this.add.text(0, 25, displayName, {
                 fontSize: '16px',
                 fontFamily: FONTS.FAMILY,
                 color: isUnlocked ? COLORS.TEXT : '#888888',
@@ -516,7 +578,7 @@ class ShopScene extends Phaser.Scene {
             // Price or status
             const priceText = isUnlocked ? 
                 'OWNED' : 
-                `${item.price || 0} coins`;
+                `$${item.price || 0}`;
                 
             const priceTextObj = this.add.text(0, 50, priceText, {
                 fontSize: '14px',
@@ -631,9 +693,12 @@ class ShopScene extends Phaser.Scene {
             gridContainer.add(itemContainer);
         });
         
-        // If we have items, preview the first one
-        if (items.length > 0) {
+        // If we have items, preview the first one only for skins, not weapons
+        if (items.length > 0 && this.selectedCategory === 'skins') {
             this.previewItem(items[0]);
+        } else if (items.length > 0) {
+            // Just create an empty preview panel for weapons without auto-previewing
+            this.createEmptyPreview();
         }
     }
     
@@ -710,53 +775,105 @@ class ShopScene extends Phaser.Scene {
         const frame = this.selectedCategory === 'skins' ? (item.defaultFrame || 0) : undefined;
         
         try {
-            const itemImage = this.add.sprite(0, -50, key, frame).setScale(0.35);
-            
-            // Apply rotation only to lances (weapons), not character skins
-            if (this.selectedCategory === 'weapons') {
-                itemImage.setRotation(Math.PI / 4); // 45 degrees in radians
-                itemImage.setScale(0.3);
-            }
-            
-            // Try to play animation if available
-            if (this.selectedCategory === 'skins' && item.animations && item.animations.length > 0) {
-                try {
-                    const anim = item.animations[0];
-                    if (typeof anim === 'string' && this.anims.exists(anim)) {
-                        itemImage.play(anim);
-                    }
-                } catch (e) {
-                    console.error('Animation error:', e);
+            // Check if texture exists before creating sprite
+            if (this.textures.exists(key)) {
+                const itemImage = this.add.sprite(0, -50, key, frame).setScale(0.35);
+                
+                // Apply rotation only to lances (weapons), not character skins
+                if (this.selectedCategory === 'weapons') {
+                    itemImage.setRotation(Math.PI / 4); // 45 degrees in radians
+                    itemImage.setScale(0.3);
                 }
+                
+                // Try to play animation if available
+                if (this.selectedCategory === 'skins' && item.animations && item.animations.length > 0) {
+                    try {
+                        const anim = item.animations[0];
+                        if (typeof anim === 'string' && this.anims.exists(anim)) {
+                            itemImage.play(anim);
+                        }
+                    } catch (e) {
+                        console.error('Animation error:', e);
+                    }
+                }
+                
+                this.previewContainer.add(itemImage);
+            } else {
+                console.error(`Preview texture not found: ${key}`);
+                this.previewContainer.add(this.add.rectangle(0, -50, 100, 100, 0xAA0000));
             }
-            
-            this.previewContainer.add(itemImage);
         } catch (error) {
             console.error(`Preview image error: ${key}`, error);
             this.previewContainer.add(this.add.rectangle(0, -50, 100, 100, 0xAA0000));
         }
         
-        // Item name
-        const nameText = this.add.text(0, 40, item.name || 'Unknown Item', {
-            fontSize: '22px',
-            fontFamily: FONTS.FAMILY,
-            color: COLORS.TEXT,
-            fontStyle: 'bold'
-        }).setOrigin(0.5);
-        nameText.setShadow(2, 2, '#000000', 2);
-        this.previewContainer.add(nameText);
-        
-        // Item description
-        if (item.description) {
-            this.previewContainer.add(
-                this.add.text(0, 80, item.description, {
+        // Only create and add name for skins, not for weapons
+        if (this.selectedCategory === 'skins') {
+            // Item name
+            const nameText = this.add.text(0, 40, item.name || 'Unknown Item', {
+                fontSize: '22px',
+                fontFamily: FONTS.FAMILY,
+                color: COLORS.TEXT,
+                fontStyle: 'bold'
+            }).setOrigin(0.5);
+            nameText.setShadow(2, 2, '#000000', 2);
+            this.previewContainer.add(nameText);
+            
+            // Item description for skins only
+            if (item.description) {
+                const descText = this.add.text(0, 80, item.description, {
                     fontSize: '16px',
                     fontFamily: FONTS.FAMILY,
                     color: COLORS.TEXT_SECONDARY,
                     wordWrap: { width: 200 },
                     align: 'center'
-                }).setOrigin(0.5, 0)
-            );
+                }).setOrigin(0.5, 0);
+                this.previewContainer.add(descText);
+            }
+        } 
+        // For weapons, show only jousting parameters - but only if they exist
+        else if (this.selectedCategory === 'weapons' && item && item.qteParams) {
+            // QTE Parameters title
+            const qteTitle = this.add.text(0, 40, "JOUSTING PARAMETERS", {
+                fontSize: '20px',
+                fontFamily: FONTS.FAMILY,
+                color: COLORS.TEXT,
+                fontStyle: 'bold'
+            }).setOrigin(0.5, 0);
+            qteTitle.setShadow(2, 2, '#000000', 2);
+            this.previewContainer.add(qteTitle);
+            
+            // QTE Parameters details
+            const qteDetails = [];
+            
+            if (item.qteParams.speedModifier !== undefined) {
+                qteDetails.push(`Speed: x${item.qteParams.speedModifier.toFixed(1)}`);
+            }
+            
+            if (item.qteParams.barWidth !== undefined) {
+                // Calculate difficulty on a 0-100 scale
+                // Smaller barWidth means higher difficulty
+                // Normalize using min barWidth 200 and max barWidth 400
+                const minBarWidth = 200; // Hardest lance has 200 barWidth
+                const maxBarWidth = 400; // Easiest lance has 400 barWidth
+                const difficulty = Math.round(100 - ((item.qteParams.barWidth - minBarWidth) / (maxBarWidth - minBarWidth) * 100));
+                qteDetails.push(`Difficulty: ${difficulty}%`);
+            }
+            
+            if (item.qteParams.buttonCount !== undefined) {
+                qteDetails.push(`Buttons: ${item.qteParams.buttonCount}`);
+            }
+            
+            if (qteDetails.length > 0) {
+                const qteText = this.add.text(0, qteTitle.y + qteTitle.height + 15, qteDetails.join('\n'), {
+                    fontSize: '18px',
+                    fontFamily: FONTS.FAMILY,
+                    color: COLORS.TEXT_SECONDARY,
+                    align: 'center',
+                    lineSpacing: 10
+                }).setOrigin(0.5, 0);
+                this.previewContainer.add(qteText);
+            }
         }
     }
     
@@ -789,7 +906,7 @@ class ShopScene extends Phaser.Scene {
             playerState.updateMoney(-item.price);
             
             // Update money display
-            this.moneyText.setText(`${this.playerMoney} coins`);
+            this.moneyText.setText(`$${this.playerMoney}`);
             
             // Unlock item
             if (this.selectedCategory === 'skins') {
@@ -806,7 +923,11 @@ class ShopScene extends Phaser.Scene {
             }
             
             // Show success message
-            this.showMessage(`You've acquired: ${item.name}!`, true);
+            if (this.selectedCategory === 'skins') {
+                this.showMessage(`You've acquired: ${item.name}!`, true);
+            } else {
+                this.showMessage(`New weapon upgrade acquired!`, true);
+            }
             
             // Refresh the display
             this.showCategory(this.selectedCategory);
@@ -817,7 +938,7 @@ class ShopScene extends Phaser.Scene {
             }
             
             // Show insufficient funds message
-            this.showMessage("You don't have enough coins for this purchase.", false);
+            this.showMessage("You don't have enough money for this purchase.", false);
         }
     }
     
@@ -847,7 +968,11 @@ class ShopScene extends Phaser.Scene {
         this.showCategory(this.selectedCategory);
         
         // Show equipped message
-        this.showMessage(`${item.name} equipped!`, true);
+        if (this.selectedCategory === 'skins') {
+            this.showMessage(`${item.name} equipped!`, true);
+        } else {
+            this.showMessage(`Weapon upgrade equipped!`, true);
+        }
     }
     
     showMessage(message, isSuccess) {
@@ -1043,5 +1168,86 @@ class ShopScene extends Phaser.Scene {
             this.debugMenu.destroy();
             this.debugMenu = null;
         }
+        
+        // Save game state when leaving the shop
+        if (playerState) {
+            playerState.saveToLocalStorage();
+        }
+    }
+    
+    createEmptyPreview() {
+        // Clear preview container
+        this.previewContainer.removeAll(true);
+        
+        const { COLORS, FONTS } = this.UI;
+        
+        // Preview wooden background
+        const previewWidth = 240;
+        const previewHeight = 320;
+        
+        const previewBg = this.add.rectangle(0, 0, previewWidth, previewHeight, COLORS.WOOD_SECONDARY, 1);
+        previewBg.setStrokeStyle(4, COLORS.WOOD_BORDER);
+        this.previewContainer.add(previewBg);
+        
+        // Add wood grain
+        const grainGraphics = this.add.graphics();
+        grainGraphics.lineStyle(1, COLORS.WOOD_GRAIN, 0.3);
+        
+        for (let i = -previewHeight/2 + 15; i < previewHeight/2; i += 20) {
+            grainGraphics.beginPath();
+            grainGraphics.moveTo(-previewWidth/2 + 10, i);
+            
+            for (let x = -previewWidth/2 + 30; x < previewWidth/2; x += 40) {
+                const yOffset = Phaser.Math.Between(-5, 5);
+                grainGraphics.lineTo(x, i + yOffset);
+            }
+            
+            grainGraphics.strokePath();
+        }
+        this.previewContainer.add(grainGraphics);
+        
+        // Add corner decorations
+        const cornerOffset = 15;
+        const cornerPositions = [
+            {x: -previewWidth/2 + cornerOffset, y: -previewHeight/2 + cornerOffset},
+            {x: previewWidth/2 - cornerOffset, y: -previewHeight/2 + cornerOffset},
+            {x: -previewWidth/2 + cornerOffset, y: previewHeight/2 - cornerOffset},
+            {x: previewWidth/2 - cornerOffset, y: previewHeight/2 - cornerOffset}
+        ];
+        
+        cornerPositions.forEach(pos => {
+            // Metal plate
+            const plate = this.add.circle(pos.x, pos.y, 8, COLORS.METAL, 1);
+            plate.setStrokeStyle(1, COLORS.METAL_DARK);
+            this.previewContainer.add(plate);
+            
+            // Nail
+            const nail = this.add.circle(pos.x, pos.y, 3, 0x999999, 1);
+            nail.setStrokeStyle(1, 0x777777);
+            this.previewContainer.add(nail);
+        });
+        
+        // Add preview title banner
+        const titleBanner = this.add.rectangle(0, -previewHeight/2 + 30, previewWidth * 0.7, 40, COLORS.WOOD_PRIMARY, 1);
+        titleBanner.setStrokeStyle(3, COLORS.WOOD_BORDER);
+        this.previewContainer.add(titleBanner);
+        
+        const title = this.add.text(0, -previewHeight/2 + 30, "PREVIEW", {
+            fontSize: '22px',
+            fontFamily: FONTS.FAMILY,
+            color: COLORS.TEXT,
+            fontStyle: 'bold'
+        }).setOrigin(0.5);
+        title.setShadow(2, 2, '#000000', 2);
+        this.previewContainer.add(title);
+        
+        // Add instruction text
+        const instructionText = this.add.text(0, 0, "Click on a weapon\nto view details", {
+            fontSize: '18px',
+            fontFamily: FONTS.FAMILY,
+            color: COLORS.TEXT_SECONDARY,
+            align: 'center'
+        }).setOrigin(0.5);
+        this.previewContainer.add(instructionText);
     }
 } 

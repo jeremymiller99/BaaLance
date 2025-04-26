@@ -84,7 +84,7 @@ class MainMenu extends Phaser.Scene {
         const versionText = this.add.text(
             w/2,
             h - 20,
-            "Version 1.0",
+            "Version 0.2",
             {
                 fontSize: '16px',
                 fontFamily: this.UI.FONTS.FAMILY,
@@ -130,7 +130,7 @@ class MainMenu extends Phaser.Scene {
         const skinKey = skins[Math.floor(Math.random() * skins.length)];
         
         // Choose random lance
-        const lances = ['lance_0', 'lance_1', 'lance_2'];
+        const lances = ['lance_0', 'lance_1', 'lance_2', 'lance_3', 'lance_4', 'lance_5'];
         const lanceKey = lances[Math.floor(Math.random() * lances.length)];
         
         // Always start from left (removed the random direction)
@@ -214,7 +214,7 @@ class MainMenu extends Phaser.Scene {
         const { COLORS, FONTS } = this.UI;
         
         // Create title banner
-        const titlePanel = this.createWoodenPanel(w/2, 120, 600, 120);
+        const titlePanel = this.createWoodenPanel(w/2, 150, 600, 120);
         titlePanel.setDepth(10); // Ensure it's above sheep
         this.containerElements.push(titlePanel);
         
@@ -229,7 +229,7 @@ class MainMenu extends Phaser.Scene {
         titlePanel.add(titleText);
         
         // Add subtitle
-        const subtitle = this.add.text(0, 30, "A Medieval Jousting Adventure", {
+        const subtitle = this.add.text(0, 30, "Sheep Jousting Arena", {
             fontSize: '24px',
             fontFamily: FONTS.FAMILY,
             color: COLORS.TEXT_SECONDARY
@@ -266,36 +266,36 @@ class MainMenu extends Phaser.Scene {
         const { width: w, height: h } = this.cameras.main;
         const { PANEL } = this.UI;
         
-        // Create main menu panel - moved lower on the screen (75% down instead of center)
-        // and removed the title, but moved UP from previous position
-        const menuPanel = this.createWoodenPanel(w/2, h * 0.65, PANEL.WIDTH, PANEL.HEIGHT);
-        menuPanel.setDepth(10); // Ensure it's above sheep
-        this.containerElements.push(menuPanel);
-        
-        // Menu buttons
+        // Menu buttons - reordered to put "Enter Arena" in the middle
         const buttons = [
-            { text: 'Enter Arena', callback: () => this.startGame() },
             { text: 'Settings', callback: () => this.toggleSettings() },
+            { text: 'Enter Arena', callback: () => this.startGame() },
             { text: 'Credits', callback: () => this.toggleCredits() }
         ];
         
-        // Calculate vertical positioning
-        const buttonSpacing = PANEL.BUTTON_HEIGHT + PANEL.BUTTON_SPACING;
-        const totalButtonHeight = buttons.length * buttonSpacing - PANEL.BUTTON_SPACING;
-        const startY = -totalButtonHeight / 2 + PANEL.BUTTON_HEIGHT / 2;
+        // Calculate horizontal positioning
+        const buttonWidth = PANEL.WIDTH - 60;
+        const buttonSpacing = 30; // space between buttons
+        const totalWidth = (buttons.length * buttonWidth) + ((buttons.length - 1) * buttonSpacing);
+        const startX = -(totalWidth / 2) + (buttonWidth / 2);
         
-        // Create menu buttons
+        // Position buttons in the center of the screen vertically
+        const centerY = h * 0.4; // Position a bit below center
+        
+        // Create menu buttons horizontally
         buttons.forEach((button, index) => {
-            const buttonY = startY + (index * buttonSpacing);
-            this.createWoodenButton(
-                menuPanel, 
-                0, 
-                buttonY, 
+            const buttonX = startX + (index * (buttonWidth + buttonSpacing));
+            const buttonContainer = this.createWoodenButton(
+                this, // Add directly to scene instead of a panel
+                w/2 + buttonX, 
+                centerY, 
                 button.text, 
-                PANEL.WIDTH - 60, 
+                buttonWidth, 
                 PANEL.BUTTON_HEIGHT, 
                 button.callback
             );
+            buttonContainer.setDepth(10); // Ensure it's above sheep
+            this.containerElements.push(buttonContainer);
         });
     }
     
@@ -633,7 +633,11 @@ class MainMenu extends Phaser.Scene {
             });
         });
         
-        container.add(buttonContainer);
+        // Only add to container if the container is not the scene itself
+        if (container !== this) {
+            container.add(buttonContainer);
+        }
+        
         return buttonContainer;
     }
     
@@ -705,6 +709,11 @@ class MainMenu extends Phaser.Scene {
         if (this.debugMenu) {
             this.debugMenu.destroy();
             this.debugMenu = null;
+        }
+        
+        // Save game state when leaving the scene
+        if (playerState) {
+            playerState.saveToLocalStorage();
         }
     }
 } 

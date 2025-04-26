@@ -39,7 +39,7 @@ class WeaponSystem {
                 price: 0,
                 unlocked: true, // Starter lance is unlocked by default
                 qteParams: {
-                    speedModifier: 1.0,
+                    speedModifier: 1.2,
                     barWidth: 400,
                     buttonCount: 2 // Only Z and X buttons
                 }
@@ -48,28 +48,70 @@ class WeaponSystem {
                 offsetX: 220,
                 offsetY: -15,
                 scale: 0.75,
-                name: 'Knight Lance',
+                name: 'Solid Lance',
                 description: 'A sturdy lance with better balance.',
+                price: 250,
+                unlocked: false,
+                qteParams: {
+                    speedModifier: 1.5,
+                    barWidth: 325,
+                    buttonCount: 3 // Z, X, and C buttons
+                }
+            },
+            'lance_3': {
+                offsetX: 220,
+                offsetY: -15,
+                scale: 0.75,
+                name: 'Knights Lance',
+                description: 'A lance worth of a knight.',
                 price: 500,
                 unlocked: false,
                 qteParams: {
-                    speedModifier: 1.2,
-                    barWidth: 300,
-                    buttonCount: 3 // Z, X, and C buttons
+                    speedModifier: 1.75,
+                    barWidth: 275,
+                    buttonCount: 3 // All buttons Z, X, C
                 }
             },
             'lance_2': {
                 offsetX: 220,
                 offsetY: -15,
                 scale: 0.75,
-                name: 'Champion Lance',
+                name: 'Champions Lance',
                 description: 'A masterfully crafted lance for tournament champions.',
-                price: 1200,
+                price: 1000,
                 unlocked: false,
                 qteParams: {
                     speedModifier: 2,
-                    barWidth: 225,
+                    barWidth: 250,
                     buttonCount: 4 // All buttons Z, X, C, V
+                }
+            },
+            'lance_4': {
+                offsetX: 220,
+                offsetY: -15,
+                scale: 0.75,
+                name: 'Fish Lance',
+                description: 'A lance that can catch fish.',
+                price: 1500,
+                unlocked: false,
+                qteParams: {
+                    speedModifier: 2.25,
+                    barWidth: 300,
+                    buttonCount: 4 // All buttons Z, X, C, V
+                }   
+            },
+            'lance_5': {
+                offsetX: 220,
+                offsetY: -15,
+                scale: 0.75,
+                name: 'Cloud Lance',
+                description: 'A mystical lance forged from clouds and lightning.',
+                price: 1500,
+                unlocked: false,
+                qteParams: {
+                    speedModifier: 2,
+                    barWidth: 200,
+                    buttonCount: 3
                 }
             }
         };

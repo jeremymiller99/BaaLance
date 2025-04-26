@@ -279,6 +279,7 @@ class JoustingOutcome {
             x: finalX,
             y: finalY,
             rotation: this.playerWon ? 3 : -3,
+            alpha: 0, // Make the loser gradually fade out
             duration: 2500, // Fixed duration in milliseconds
             ease: 'Power2'
         });

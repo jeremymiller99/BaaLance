@@ -18,7 +18,14 @@ class CareerScene extends Phaser.Scene {
                 CARD_BORDER: 0x555555,
                 ROOKIE_LEAGUE: 0x66ff66,
                 AMATEUR_LEAGUE: 0xffaa00,
-                PRO_LEAGUE: 0xff6666
+                PRO_LEAGUE: 0xff6666,
+                // Add wooden panel colors
+                WOOD_PRIMARY: 0x8B4513, // Primary wood color
+                WOOD_SECONDARY: 0x5c4033, // Darker wood color
+                WOOD_BORDER: 0x3c2a21, // Wood border color
+                WOOD_GRAIN: 0x3c2a21, // Wood grain color
+                METAL: 0x696969, // Metal color for nails
+                METAL_DARK: 0x444444 // Darker metal
             },
             FONTS: {
                 FAMILY: 'Arial',
@@ -467,17 +474,9 @@ class CareerScene extends Phaser.Scene {
                     });
                 }
             } else if (!isAccessible) {
-                // Add a lock icon for locked enemies
-                const lockIcon = this.add.text(0, 0, "🔒", {
-                    fontSize: '80px'
-                }).setOrigin(0.5);
-                posterContainer.add(lockIcon);
-                
                 // Make the whole poster darker and semi-transparent
                 posterContainer.list.forEach(item => {
-                    if (item !== lockIcon) {
-                        item.setAlpha(0.7);
-                    }
+                    item.setAlpha(0.7);
                 });
             }
             
@@ -632,10 +631,15 @@ class CareerScene extends Phaser.Scene {
         // Create divider design in the middle (inspired by medieval tournament lists)
         this.createMedievalDivider(w/2, h/2);
         
+        // Define consistent Y position for name panels
+        const namePanelY = h/2 - 180;
+        
         // ---- PLAYER SIDE (LEFT) ----
         
-        // Create heraldic banner for player side
-        this.createHeraldryBanner(w/4, 150, 0x3c275a, "CHALLENGER", true); // Royal purple
+        // Create name panel at the top instead of banner
+        const playerNamePanel = this.createWoodenPanel(w/4, namePanelY, 250, 80, "YOU");
+        playerNamePanel.setScale(0.9);
+        this.matchupPreview.add(playerNamePanel);
         
         // Create player container starting from left (off-screen)
         const playerContainer = this.add.container(-200, h/2);
@@ -649,24 +653,17 @@ class CareerScene extends Phaser.Scene {
         
         this.matchupPreview.add(playerContainer);
         
-        // Player name with medieval styling
-        const playerNameBg = this.add.rectangle(w/4, h - 150, 300, 80, 0x3c275a, 0.8);
-        playerNameBg.setStrokeStyle(3, 0xd4af37);
-        this.matchupPreview.add(playerNameBg);
-        
-        const playerName = this.add.text(w/4, h - 150, "YOU", {
-            fontSize: '42px',
-            fontFamily: 'Georgia, serif',
-            color: '#ffffff',
-            fontStyle: 'bold'
-        }).setOrigin(0.5);
-        playerName.setShadow(3, 3, '#000000', 5);
-        this.matchupPreview.add(playerName);
-        
         // ---- ENEMY SIDE (RIGHT) ----
         
-        // Create heraldic banner for enemy side
-        this.createHeraldryBanner(3*w/4, 150, 0x8b0000, "OPPONENT", false); // Dark red
+        // Create name panel at the top instead of banner
+        const enemyNamePanel = this.createWoodenPanel(3*w/4, namePanelY, 250, 80, enemy.name);
+        enemyNamePanel.setScale(0.9);
+        // Adjust text size to fit within the panel if the enemy name is long
+        const enemyNameText = enemyNamePanel.list.find(item => item.type === 'Text');
+        if (enemyNameText && enemy.name.length > 10) {
+            enemyNameText.setFontSize('18px');
+        }
+        this.matchupPreview.add(enemyNamePanel);
         
         // Create enemy container starting from right (off-screen)
         const enemyContainer = this.add.container(w + 200, h/2);
@@ -681,65 +678,62 @@ class CareerScene extends Phaser.Scene {
         
         this.matchupPreview.add(enemyContainer);
         
-        // Enemy name with medieval styling
-        const enemyNameBg = this.add.rectangle(3*w/4, h - 150, 300, 80, 0x8b0000, 0.8);
-        enemyNameBg.setStrokeStyle(3, 0xd4af37);
-        this.matchupPreview.add(enemyNameBg);
-        
-        const enemyName = this.add.text(3*w/4, h - 150, enemy.name, {
-            fontSize: '42px',
-            fontFamily: 'Georgia, serif',
-            color: '#ffffff',
-            fontStyle: 'bold'
-        }).setOrigin(0.5);
-        enemyName.setShadow(3, 3, '#000000', 5);
-        this.matchupPreview.add(enemyName);
-        
         // ---- TITLE AND BUTTONS ----
         
-        // Create title with medieval styling
-        const titleBg = this.add.rectangle(w/2, 80, 400, 100, 0x32230c, 0.8);
-        titleBg.setStrokeStyle(4, 0xd4af37); // Gold border
-        this.matchupPreview.add(titleBg);
+        // Create title with wooden panel
+        const titlePanel = this.createWoodenPanel(w/2, h/2 - 300, 400, 100, "Bounty Matchup");
+        this.matchupPreview.add(titlePanel);
         
-        const title = this.add.text(w/2, 80, "League Matchup", {
-            fontSize: '44px',
-            fontFamily: 'Georgia, serif',
-            color: '#d4af37', // Gold text
-            fontStyle: 'bold'
-        }).setOrigin(0.5);
-        title.setShadow(3, 3, '#000000', 5);
-        this.matchupPreview.add(title);
+        // Create container for buttons
+        const buttonsContainer = this.add.container(w/2, h/2 + 250);
+        this.matchupPreview.add(buttonsContainer);
         
-        // Add buttons
-        const buttonY = h - 70;
+        // Fight button with wooden style
+        const fightButton = this.createWoodenButton(
+            buttonsContainer,
+            -150, 20,
+            "FIGHT!",
+            220, 80,
+            () => {
+                // Stop all tweens to prevent animation conflicts
+                this.tweens.killAll();
+                
+                // Flash effect
+                const flash = this.add.rectangle(w/2, h/2, w, h, 0xffffff, 0);
+                flash.setDepth(1000);
+                
+                this.tweens.add({
+                    targets: flash,
+                    alpha: 1,
+                    duration: 300,
+                    onComplete: () => {
+                        this.hideMatchupPreview();
+                        this.startCareerMatch(enemy);
+                    }
+                });
+            }
+        );
         
-        // Fight button
-        const fightButton = this.add.rectangle(w/2 - 150, buttonY + 20, 220, 80, 0x8b0000, 0.8);
-        fightButton.setStrokeStyle(3, 0xd4af37);
-        this.matchupPreview.add(fightButton);
+        // Update font size to match previous style
+        fightButton.list[2].setFontSize('36px');
         
-        const fightText = this.add.text(w/2 - 150, buttonY + 20, "FIGHT!", {
-            fontSize: '36px',
-            fontFamily: 'Georgia, serif',
-            color: '#ffffff',
-            fontStyle: 'bold'
-        }).setOrigin(0.5);
-        fightText.setShadow(2, 2, '#000000', 3);
-        this.matchupPreview.add(fightText);
+        // Cancel button with wooden style
+        const cancelButton = this.createWoodenButton(
+            buttonsContainer,
+            150, 20,
+            "CANCEL",
+            220, 80,
+            () => {
+                // Play click sound
+                if (audioSystem) {
+                    audioSystem.playClick();
+                }
+                this.hideMatchupPreview();
+            }
+        );
         
-        // Cancel button
-        const cancelButton = this.add.rectangle(w/2 + 150, buttonY + 20, 220, 80, 0x32230c, 0.8);
-        cancelButton.setStrokeStyle(3, 0xd4af37);
-        this.matchupPreview.add(cancelButton);
-        
-        const cancelText = this.add.text(w/2 + 150, buttonY + 20, "CANCEL", {
-            fontSize: '36px',
-            fontFamily: 'Georgia, serif',
-            color: '#ffffff',
-            fontStyle: 'bold'
-        }).setOrigin(0.5);
-        this.matchupPreview.add(cancelText);
+        // Update font size to match previous style
+        cancelButton.list[2].setFontSize('36px');
         
         // ---- ANIMATIONS ----
         
@@ -747,16 +741,10 @@ class CareerScene extends Phaser.Scene {
         this.matchupPreview.alpha = 1;
         playerContainer.alpha = 0;
         enemyContainer.alpha = 0;
-        playerNameBg.alpha = 0;
-        playerName.alpha = 0;
-        enemyNameBg.alpha = 0;
-        enemyName.alpha = 0;
-        titleBg.alpha = 0;
-        title.alpha = 0;
-        fightButton.alpha = 0;
-        fightText.alpha = 0;
-        cancelButton.alpha = 0;
-        cancelText.alpha = 0;
+        playerNamePanel.alpha = 0;
+        enemyNamePanel.alpha = 0;
+        titlePanel.alpha = 0;
+        buttonsContainer.alpha = 0;
         
         // Animation sequence
         
@@ -768,12 +756,11 @@ class CareerScene extends Phaser.Scene {
             yoyo: true,
             onComplete: () => {
                 // 2. Show the title with a scale effect
-                titleBg.alpha = 1;
-                title.alpha = 1;
-                title.setScale(2);
+                titlePanel.alpha = 1;
+                titlePanel.setScale(1.5);
                 
                 this.tweens.add({
-                    targets: title,
+                    targets: titlePanel,
                     scale: 1,
                     duration: 500,
                     ease: 'Back.out',
@@ -788,13 +775,12 @@ class CareerScene extends Phaser.Scene {
                             ease: 'Back.out',
                             onComplete: () => {
                                 // Show player name
-                                playerNameBg.alpha = 1;
-                                playerName.alpha = 1;
-                                playerName.setScale(0.5);
+                                playerNamePanel.alpha = 1;
+                                playerNamePanel.setScale(0.5);
                                 
                                 this.tweens.add({
-                                    targets: playerName,
-                                    scale: 1,
+                                    targets: playerNamePanel,
+                                    scale: 0.9,
                                     duration: 300,
                                     ease: 'Back.out'
                                 });
@@ -815,13 +801,12 @@ class CareerScene extends Phaser.Scene {
                                 ease: 'Back.out',
                                 onComplete: () => {
                                     // Show enemy name
-                                    enemyNameBg.alpha = 1;
-                                    enemyName.alpha = 1;
-                                    enemyName.setScale(0.5);
+                                    enemyNamePanel.alpha = 1;
+                                    enemyNamePanel.setScale(0.5);
                                     
                                     this.tweens.add({
-                                        targets: enemyName,
-                                        scale: 1,
+                                        targets: enemyNamePanel,
+                                        scale: 0.9,
                                         duration: 300,
                                         ease: 'Back.out'
                                     });
@@ -831,14 +816,19 @@ class CareerScene extends Phaser.Scene {
                                     
                                     // 5. Finally show buttons with bounce effect
                                     this.time.delayedCall(300, () => {
-                                        fightButton.alpha = 1;
-                                        fightText.alpha = 1;
-                                        cancelButton.alpha = 1;
-                                        cancelText.alpha = 1;
+                                        buttonsContainer.alpha = 1;
+                                        buttonsContainer.setScale(0.5);
+                                        
+                                        this.tweens.add({
+                                            targets: buttonsContainer,
+                                            scale: 1,
+                                            duration: 300,
+                                            ease: 'Back.out'
+                                        });
                                         
                                         // Make fight button pulse
                                         this.tweens.add({
-                                            targets: [fightButton, fightText],
+                                            targets: fightButton,
                                             scale: 1.1,
                                             duration: 600,
                                             yoyo: true,
@@ -851,63 +841,6 @@ class CareerScene extends Phaser.Scene {
                     }
                 });
             }
-        });
-        
-        // Make buttons interactive
-        fightButton.setInteractive({ useHandCursor: true });
-        cancelButton.setInteractive({ useHandCursor: true });
-        
-        // Button hover effects
-        fightButton.on('pointerover', () => {
-            fightButton.setScale(1.1);
-            fightText.setScale(1.1);
-        });
-        
-        fightButton.on('pointerout', () => {
-            fightButton.setScale(1);
-            fightText.setScale(1);
-        });
-        
-        fightButton.on('pointerdown', () => {
-            // Play click sound
-            if (audioSystem) {
-                audioSystem.playClick();
-            }
-            
-            // Stop all tweens to prevent animation conflicts
-            this.tweens.killAll();
-            
-            // Flash effect
-            const flash = this.add.rectangle(w/2, h/2, w, h, 0xffffff, 0);
-            flash.setDepth(1000);
-            
-            this.tweens.add({
-                targets: flash,
-                alpha: 1,
-                duration: 300,
-                onComplete: () => {
-                    this.hideMatchupPreview();
-                    this.startCareerMatch(enemy);
-                }
-            });
-        });
-        
-        cancelButton.on('pointerover', () => {
-            cancelButton.setScale(1.05);
-            cancelText.setScale(1.05);
-        });
-        
-        cancelButton.on('pointerout', () => {
-            cancelButton.setScale(1);
-            cancelText.setScale(1);
-        });
-        
-        cancelButton.on('pointerdown', () => {
-            // Play click sound
-            if (audioSystem) {
-                audioSystem.playClick();
-            }
-            this.hideMatchupPreview();
         });
     }
     
@@ -973,10 +906,6 @@ class CareerScene extends Phaser.Scene {
             yoyo: true,
             repeat: -1
         });
-        
-        // Add medieval banner decorations above and below VS emblem
-        this.createBannerDecoration(dividerContainer, 0, -150, 0x800000); // Above VS
-        this.createBannerDecoration(dividerContainer, 0, 150, 0x013220);  // Below VS
         
         // Add custom particles
         this.createCustomParticles(dividerContainer, 0, 0);
@@ -1701,5 +1630,134 @@ class CareerScene extends Phaser.Scene {
             this.debugMenu.destroy();
             this.debugMenu = null;
         }
+        
+        // Save game state when leaving the career scene
+        if (playerState) {
+            playerState.saveToLocalStorage();
+        }
+    }
+    
+    // Helper function to create a medieval wooden panel
+    createWoodenPanel(x, y, width, height, titleText = null) {
+        const { COLORS, FONTS } = this.UI;
+        
+        // Create main container for panel
+        const container = this.add.container(x, y);
+        
+        // Create panel background with wood texture
+        const panel = this.add.rectangle(0, 0, width, height, COLORS.WOOD_PRIMARY, 1);
+        panel.setStrokeStyle(6, COLORS.WOOD_BORDER);
+        container.add(panel);
+        
+        // Add wood grain texture
+        const grainGraphics = this.add.graphics();
+        grainGraphics.lineStyle(1, COLORS.WOOD_GRAIN, 0.3);
+        
+        // Create horizontal wood grain lines
+        for (let i = -height/2 + 15; i < height/2; i += 20) {
+            grainGraphics.beginPath();
+            grainGraphics.moveTo(-width/2 + 10, i);
+            
+            for (let x = -width/2 + 30; x < width/2; x += 40) {
+                const yOffset = Phaser.Math.Between(-5, 5);
+                grainGraphics.lineTo(x, i + yOffset);
+            }
+            
+            grainGraphics.strokePath();
+        }
+        container.add(grainGraphics);
+        
+        // Add title if provided - simplified version with just text
+        if (titleText) {
+            // Add centered title text with gold/yellow color
+            const title = this.add.text(0, 0, titleText, {
+                fontSize: '28px',
+                fontFamily: 'Georgia, serif',
+                color: '#FFD700', // Gold/yellow text
+                fontStyle: 'bold'
+            }).setOrigin(0.5, 0.5); // Center both horizontally and vertically
+            title.setShadow(2, 2, '#000000', 3);
+            container.add(title);
+        }
+        
+        return container;
+    }
+    
+    // Helper function to create a medieval wooden button
+    createWoodenButton(container, x, y, text, width, height, callback) {
+        const { COLORS, FONTS } = this.UI;
+        
+        // Button container for organization
+        const buttonContainer = this.add.container(x, y);
+        
+        // Wooden button background
+        const buttonBg = this.add.rectangle(0, 0, width, height, COLORS.WOOD_PRIMARY, 1);
+        buttonBg.setStrokeStyle(4, COLORS.WOOD_BORDER);
+        buttonContainer.add(buttonBg);
+        
+        // Add wood grain texture
+        const grainGraphics = this.add.graphics();
+        grainGraphics.lineStyle(1, COLORS.WOOD_GRAIN, 0.3);
+        
+        // Horizontal wood grain lines
+        for (let i = -height/2 + 5; i < height/2; i += 8) {
+            // Make lines slightly wavy
+            grainGraphics.beginPath();
+            grainGraphics.moveTo(-width/2 + 5, i);
+            
+            for (let x = -width/2 + 10; x < width/2; x += 15) {
+                const yOffset = Phaser.Math.Between(-1, 1);
+                grainGraphics.lineTo(x, i + yOffset);
+            }
+            
+            grainGraphics.strokePath();
+        }
+        buttonContainer.add(grainGraphics);
+        
+        // Button text with gold color
+        const buttonText = this.add.text(0, 0, text, {
+            fontSize: '24px',
+            fontFamily: FONTS.FAMILY,
+            color: '#FFD700', // Gold text
+            fontStyle: 'bold'
+        }).setOrigin(0.5);
+        
+        // Add shadow to text
+        buttonText.setShadow(2, 2, '#000000', 3);
+        buttonContainer.add(buttonText);
+        
+        // Make button interactive
+        buttonBg.setInteractive({ useHandCursor: true });
+        
+        // Hover and click effects
+        buttonBg.on('pointerover', () => {
+            buttonBg.setFillStyle(COLORS.WOOD_SECONDARY);
+            buttonContainer.setScale(1.05);
+        });
+        
+        buttonBg.on('pointerout', () => {
+            buttonBg.setFillStyle(COLORS.WOOD_PRIMARY);
+            buttonContainer.setScale(1);
+        });
+        
+        buttonBg.on('pointerdown', () => {
+            // Pressed effect
+            buttonContainer.setScale(0.95);
+            
+            // Play click sound
+            if (audioSystem) {
+                audioSystem.playClick();
+            }
+            
+            // Call the callback
+            if (callback) {
+                callback();
+            }
+        });
+        
+        // Add the button container to the parent container
+        container.add(buttonContainer);
+        
+        return buttonContainer;
     }
 } 

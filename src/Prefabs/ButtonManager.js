@@ -773,7 +773,7 @@ class ButtonManager {
         // Make sure player stays off screen by moving it further down
         if (this.scene.playerContainer) {
             this.scene.playerContainer.y += 300;
-            this.scene.playerContainer.alpha = 0.5; // Fade out player
+            this.scene.playerContainer.alpha = 0; // Fully hide the player when falling off
         }
         
         // Create game over text with message about falling

@@ -13,19 +13,19 @@ class SkinSystem {
             'sheep1_sunglass': {
                 key: 'sheep1_sunglass',
                 name: 'Sheep 1 Sunglass',
-                price: 500,
+                price: 250,
                 unlocked: false
             },
             'sheep1_tophat': {
                 key: 'sheep1_tophat',
                 name: 'Sheep 1 Top Hat',
-                price: 1000,
+                price: 250,
                 unlocked: false
             },
             'sheep1_bling': {
                 key: 'sheep1_bling',
                 name: 'Sheep 1 Bling',
-                price: 2000,
+                price: 250,
                 unlocked: false
             },
             'sheep2_default': {
@@ -37,7 +37,7 @@ class SkinSystem {
             'ram_default': {
                 key: 'ram_default',
                 name: 'Ram Default',
-                price: 1500,
+                price: 250,
                 unlocked: false
             },
             

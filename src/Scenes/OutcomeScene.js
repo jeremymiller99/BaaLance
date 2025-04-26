@@ -785,6 +785,18 @@ class OutcomeScene extends Phaser.Scene {
                 });
             }
             
+            // Animate player falling off with rotation and fade out to opacity 0
+            if (this.playerContainer) {
+                this.tweens.add({
+                    targets: this.playerContainer,
+                    y: h + 200, // Fall below screen
+                    rotation: 1.5, // Rotate as falling
+                    alpha: 0, // Fade out completely
+                    duration: 1500,
+                    ease: 'Power2.easeIn'
+                });
+            }
+            
             // Show game UI after short delay
             this.time.delayedCall(2500, () => {
                 this.showGameOverUI('lose');
@@ -1207,6 +1219,11 @@ class OutcomeScene extends Phaser.Scene {
         if (this.debugMenu) {
             this.debugMenu.destroy();
             this.debugMenu = null;
+        }
+        
+        // Save the game state
+        if (playerState) {
+            playerState.saveToLocalStorage();
         }
     }
 

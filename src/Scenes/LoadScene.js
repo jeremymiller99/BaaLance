@@ -55,6 +55,9 @@ class LoadScene extends Phaser.Scene {
         this.load.image('lance_0', 'assets/lance_0.png');
         this.load.image('lance_1', 'assets/lance_1.png');
         this.load.image('lance_2', 'assets/lance_2.png');
+        this.load.image('lance_3', 'assets/lance_3.png');
+        this.load.image('lance_4', 'assets/lance_4.png');
+        this.load.image('lance_5', 'assets/lance_5.png');
         
         // Particle effects
         this.load.image('particle', 'assets/particle.png');
@@ -92,6 +95,17 @@ class LoadScene extends Phaser.Scene {
         // Ensure music starts playing
         if (audioSystem) {
             audioSystem.startMusicPlaylist();
+        }
+        
+        // Check if player data needs to be loaded
+        if (playerState) {
+            console.log('Checking for saved game data...');
+            if (playerState.hasSaveData()) {
+                console.log('Found saved game data, loading...');
+                playerState.loadFromLocalStorage();
+            } else {
+                console.log('No saved game data found, using default values');
+            }
         }
         
         // Start the main menu scene

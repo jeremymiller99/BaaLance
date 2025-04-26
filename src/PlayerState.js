@@ -31,6 +31,12 @@ class PlayerState {
             }
         };
         
+        // Define storage key
+        this.storageKey = 'baalance_save_data';
+        
+        // Try to load saved data
+        this.loadFromLocalStorage();
+        
         // Pending stats update for when scene is not ready
         this.pendingStatsUpdate = null;
         
@@ -43,6 +49,78 @@ class PlayerState {
      */
     getState() {
         return this.data;
+    }
+    
+    /**
+     * Save player state to local storage
+     * @returns {boolean} Whether the save was successful
+     */
+    saveToLocalStorage() {
+        try {
+            // Convert data to JSON string
+            const saveData = JSON.stringify(this.data);
+            
+            // Save to local storage
+            localStorage.setItem(this.storageKey, saveData);
+            
+            console.log('Game saved successfully');
+            return true;
+        } catch (error) {
+            console.error('Error saving game:', error);
+            return false;
+        }
+    }
+    
+    /**
+     * Load player state from local storage
+     * @returns {boolean} Whether data was successfully loaded
+     */
+    loadFromLocalStorage() {
+        try {
+            // Get saved data from local storage
+            const saveData = localStorage.getItem(this.storageKey);
+            
+            // If no saved data, keep default values
+            if (!saveData) {
+                console.log('No saved data found, using defaults');
+                return false;
+            }
+            
+            // Parse saved data
+            const parsedData = JSON.parse(saveData);
+            
+            // Update player state with saved data
+            this.data = parsedData;
+            
+            console.log('Game loaded successfully');
+            return true;
+        } catch (error) {
+            console.error('Error loading saved game:', error);
+            return false;
+        }
+    }
+    
+    /**
+     * Check if a save exists
+     * @returns {boolean} Whether a save exists
+     */
+    hasSaveData() {
+        return localStorage.getItem(this.storageKey) !== null;
+    }
+    
+    /**
+     * Delete saved game data
+     * @returns {boolean} Whether deletion was successful
+     */
+    deleteSaveData() {
+        try {
+            localStorage.removeItem(this.storageKey);
+            console.log('Save data deleted');
+            return true;
+        } catch (error) {
+            console.error('Error deleting save data:', error);
+            return false;
+        }
     }
     
     /**
@@ -69,6 +147,9 @@ class PlayerState {
         
         // Store pending stats update for other scenes to use
         this.pendingStatsUpdate = { score, won };
+        
+        // Save updated state to local storage
+        this.saveToLocalStorage();
     }
     
     /**
@@ -88,6 +169,7 @@ class PlayerState {
     setCurrentSkin(skinId) {
         if (this.data.skins[skinId]) {
             this.data.currentSkin = skinId;
+            this.saveToLocalStorage();
         }
     }
     
@@ -97,6 +179,7 @@ class PlayerState {
      */
     addSkin(skinId) {
         this.data.skins[skinId] = true;
+        this.saveToLocalStorage();
     }
     
     /**
@@ -106,6 +189,7 @@ class PlayerState {
     setCurrentLance(lanceId) {
         if (this.data.weapons[lanceId]) {
             this.data.equipment.currentLance = lanceId;
+            this.saveToLocalStorage();
         }
     }
     
@@ -124,6 +208,7 @@ class PlayerState {
      */
     unlockWeapon(weaponId) {
         this.data.weapons[weaponId] = true;
+        this.saveToLocalStorage();
     }
     
     /**
@@ -133,6 +218,7 @@ class PlayerState {
     updateMoney(amount) {
         this.data.money += amount;
         if (this.data.money < 0) this.data.money = 0;
+        this.saveToLocalStorage();
     }
     
     /**
@@ -172,6 +258,8 @@ class PlayerState {
                 this.data.money += rewards.moneyReward;
             }
         }
+        
+        this.saveToLocalStorage();
     }
     
     /**
@@ -293,6 +381,8 @@ class PlayerState {
                 this.data.enemyProgress.leagues[leagueId] = true;
             });
             
+            this.saveToLocalStorage();
+            
             return rank;
         } catch (error) {
             console.error("Error in updateRankAndLeagues:", error);
@@ -314,5 +404,33 @@ class PlayerState {
                 winsToNextRank: 3 - (this.data.stats.wins || 0)
             };
         }
+    }
+    
+    /**
+     * Reset player state to defaults
+     */
+    resetPlayerState() {
+        // Reset player state to default values
+        this.data = {
+            money: 100,
+            stats: {
+                wins: 0,
+                losses: 0,
+                highestScore: 0
+            },
+            equipment: {
+                currentLance: 'lance_0'
+            },
+            currentSkin: 'default',
+            skins: {
+                'default': true
+            },
+            weapons: {
+                'lance_0': true
+            }
+        };
+        
+        // Delete saved data
+        this.deleteSaveData();
     }
 } 
